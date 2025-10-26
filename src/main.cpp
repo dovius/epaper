@@ -212,7 +212,7 @@ void sceneProgressPartial()
 
     constexpr UWORD barLeft = 32;
     constexpr UWORD barTop = 72;
-    constexpr UWORD barRight = Paint.Width - 32;
+    const UWORD barRight = (Paint.Width > 32) ? static_cast<UWORD>(Paint.Width - 32) : Paint.Width;
     constexpr UWORD barBottom = 92;
     Paint_DrawRectangle(barLeft, barTop, barRight, barBottom, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
 
@@ -248,8 +248,8 @@ void sceneClockPartial()
 
     constexpr UWORD timeBoxLeft = 110;
     constexpr UWORD timeBoxTop = 50;
-    constexpr UWORD timeBoxRight = Paint.Width - 18;
-    constexpr UWORD timeBoxBottom = timeBoxTop + Font24.Height + 12;
+    const UWORD timeBoxRight = (Paint.Width > 18) ? static_cast<UWORD>(Paint.Width - 18) : Paint.Width;
+    const UWORD timeBoxBottom = static_cast<UWORD>(timeBoxTop + Font24.Height + 12);
     Paint_DrawRectangle(timeBoxLeft - 6, timeBoxTop - 6, timeBoxRight, timeBoxBottom,
                         BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
 
