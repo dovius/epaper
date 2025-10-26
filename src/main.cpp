@@ -1,11 +1,19 @@
 /*****************************************************************************
- * | Project     :  EPD 2.13" showcase
- * | Author      :  Refactored demo
- * | Description :  Rich, looped scenes highlighting drawing, charts,
- *                  partial updates, and bitmap overlays.
+ * Hacker News Top Stories E-Paper Demo
+ *
+ * Fetches the latest Hacker News top stories and renders the headlines on
+ * the 2.13" Waveshare e-paper display. The sketch connects to Wi-Fi,
+ * performs HTTPS requests against the public HN API, and refreshes
+ * periodically with a status screen shown between updates.
+ *
+ * Update WIFI_SSID and WIFI_PASSWORD with your network credentials before
+ * flashing the sketch.
  *****************************************************************************/
 
 #include <Arduino.h>
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 #include <stdio.h>
 
 #include "DEV_Config.h"
@@ -13,293 +21,400 @@
 #include "GUI_Paint.h"
 #include "ImageData.h"
 
-namespace demo {
+namespace hn {
+
+// ---------- Configuration ----------
+
+constexpr char WIFI_SSID[] = "YOUR_WIFI_SSID";
+constexpr char WIFI_PASSWORD[] = "YOUR_WIFI_PASSWORD";
+
+constexpr uint32_t kRefreshIntervalMs = 300000UL;  // 5 minutes
+constexpr size_t kMaxStories = 6;
+constexpr size_t kMaxTitleLength = 96;
+constexpr uint32_t kRequestTimeoutMs = 15000;
+constexpr char kTopStoriesEndpoint[] = "https://hacker-news.firebaseio.com/v0/topstories.json";
+constexpr char kItemEndpointPrefix[] = "https://hacker-news.firebaseio.com/v0/item/";
+constexpr char kItemEndpointSuffix[] = ".json";
 
 constexpr UWORD kPanelWidth = EPD_2in13_V4_WIDTH;
 constexpr UWORD kPanelHeight = EPD_2in13_V4_HEIGHT;
 constexpr UWORD kDefaultRotate = ROTATE_90;
-constexpr uint32_t kShortHoldMs = 2500;
-constexpr uint32_t kMediumHoldMs = 3200;
-constexpr uint32_t kLongHoldMs = 4000;
 
-UBYTE *sFrame = nullptr;
-constexpr UWORD imageSize()
+// ---------- Story representation ----------
+
+struct Story {
+    uint32_t id = 0;
+    char title[kMaxTitleLength] = {0};
+};
+
+Story gStories[kMaxStories];
+size_t gStoryCount = 0;
+
+UBYTE *gFrame = nullptr;
+
+// ---------- Utility helpers ----------
+
+constexpr UWORD imageSizeBytes()
 {
     return ((kPanelWidth + 7U) / 8U) * kPanelHeight;
 }
 
-bool ensureFrame()
+bool ensureFrameBuffer()
 {
-    if (sFrame != nullptr) {
+    if (gFrame != nullptr) {
         return true;
     }
-    sFrame = static_cast<UBYTE *>(malloc(imageSize()));
-    if (sFrame == nullptr) {
-        Debug("Frame allocation failed\r\n");
+    gFrame = static_cast<UBYTE *>(malloc(imageSizeBytes()));
+    if (gFrame == nullptr) {
+        Debug("Failed to allocate frame buffer\r\n");
         return false;
     }
     return true;
 }
 
-void prepareCanvas(UWORD color = WHITE)
+void initCanvas(UWORD background = WHITE)
 {
-    Paint_NewImage(sFrame, kPanelWidth, kPanelHeight, kDefaultRotate, color);
-    Paint_SelectImage(sFrame);
-    Paint_Clear(color);
+    Paint_NewImage(gFrame, kPanelWidth, kPanelHeight, kDefaultRotate, background);
+    Paint_SelectImage(gFrame);
+    Paint_Clear(background);
 }
 
-void pushFull(bool fast = false)
+void fullRefresh(bool fast = false)
 {
     if (fast) {
         EPD_2in13_V4_Init_Fast();
-        EPD_2in13_V4_Display_Fast(sFrame);
+        EPD_2in13_V4_Display_Fast(gFrame);
     } else {
         EPD_2in13_V4_Init();
-        EPD_2in13_V4_Display_Base(sFrame);
+        EPD_2in13_V4_Display_Base(gFrame);
     }
 }
 
-void drawHeader(const char *title)
+void showStatus(const char *line1, const char *line2 = nullptr)
 {
+    initCanvas();
     Paint_DrawRectangle(0, 0, Paint.Width - 1, 26, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    Paint_DrawString_EN(6, 4, title, &Font16, WHITE, BLACK);
-}
+    Paint_DrawString_EN(6, 4, "Hacker News", &Font16, WHITE, BLACK);
 
-void sceneWelcome()
-{
-    prepareCanvas();
-    drawHeader("EPD Showcase");
-    Paint_DrawRectangle(0, 0, Paint.Width - 1, Paint.Height - 1, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawString_EN(12, 38, "2.13\" e-Paper", &Font24, BLACK, WHITE);
-    Paint_DrawString_EN(12, 68, "Feature tour", &Font20, BLACK, WHITE);
-    Paint_DrawString_EN(16, 92, "- Shapes, charts, widgets", &Font12, BLACK, WHITE);
-    Paint_DrawString_EN(16, 106, "- Partial refresh updates", &Font12, BLACK, WHITE);
-    pushFull(false);
-    DEV_Delay_ms(kLongHoldMs);
-}
-
-void sceneShapeGallery()
-{
-    prepareCanvas();
-    drawHeader("Vector Gallery");
-    Paint_DrawRectangle(10, 32, Paint.Width - 10, Paint.Height - 10, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawLine(10, 82, Paint.Width - 10, 82, BLACK, DOT_PIXEL_1X1, LINE_STYLE_DOTTED);
-    Paint_DrawLine(Paint.Width / 2, 32, Paint.Width / 2, Paint.Height - 10, BLACK, DOT_PIXEL_1X1, LINE_STYLE_DOTTED);
-
-    // Left column
-    Paint_DrawCircle(40, 60, 18, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawCircle(40, 106, 16, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    Paint_DrawLine(24, 96, 56, 118, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-    Paint_DrawLine(56, 96, 24, 118, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-
-    // Right column
-    Paint_DrawRectangle(138, 46, 188, 96, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    Paint_DrawRectangle(200, 46, 240, 96, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawLine(205, 102, 235, 120, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-    Paint_DrawLine(235, 102, 205, 120, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-
-    Paint_DrawString_EN(16, 108, "Solid + outline primitives", &Font8, BLACK, WHITE);
-    pushFull(true);
-    DEV_Delay_ms(kShortHoldMs);
-}
-
-void sceneDataWidgets()
-{
-    prepareCanvas();
-    drawHeader("Data Widgets");
-
-    struct Card {
-        const char *title;
-        const char *value;
-        const char *unit;
-    };
-    constexpr Card cards[] = {
-        {"Temp", "24", "C"},
-        {"Hum", "48", "%"},
-        {"Battery", "3.92", "V"},
-    };
-
-    constexpr UWORD cardTop = 36;
-    constexpr UWORD cardBottom = 112;
-    constexpr UWORD cardWidth = 72;
-    constexpr UWORD gap = 8;
-    UWORD x = 12;
-
-    for (const auto &card : cards) {
-        UWORD right = x + cardWidth;
-        Paint_DrawRectangle(x, cardTop, right, cardBottom, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-        Paint_DrawString_EN(x + 6, cardTop + 6, card.title, &Font12, BLACK, WHITE);
-        Paint_DrawString_EN(x + 6, cardTop + 30, card.value, &Font20, BLACK, WHITE);
-        Paint_DrawString_EN(x + 6, cardBottom - 20, card.unit, &Font12, BLACK, WHITE);
-        x = right + gap;
+    UWORD y = 50;
+    if (line1 != nullptr) {
+        Paint_DrawString_EN(20, y, line1, &Font16, BLACK, WHITE);
+        y += Font16.Height + 6;
+    }
+    if (line2 != nullptr) {
+        Paint_DrawString_EN(20, y, line2, &Font12, BLACK, WHITE);
     }
 
-    Paint_DrawString_EN(14, cardBottom + 2, "Compact widgets for dashboards", &Font8, BLACK, WHITE);
-    pushFull(true);
-    DEV_Delay_ms(kShortHoldMs);
+    fullRefresh(true);
 }
 
-void sceneTrend()
+bool ensureWifi()
 {
-    prepareCanvas();
-    drawHeader("24h Trend");
+    if (WiFi.status() == WL_CONNECTED) {
+        return true;
+    }
 
-    constexpr int values[] = {12, 34, 28, 46, 60, 52, 38, 22};
-    int maxValue = 0;
-    for (int value : values) {
-        if (value > maxValue) {
-            maxValue = value;
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+    uint32_t start = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - start < 20000UL) {
+        delay(500);
+    }
+    return WiFi.status() == WL_CONNECTED;
+}
+
+bool httpGet(const char *url, String &outBody)
+{
+    WiFiClientSecure client;
+    client.setTimeout(kRequestTimeoutMs / 1000);
+    client.setInsecure();  // Hacker News API uses HTTPS (no static cert here)
+
+    HTTPClient http;
+    http.setConnectTimeout(kRequestTimeoutMs);
+
+    if (!http.begin(client, url)) {
+        Debug("HTTP begin failed\r\n");
+        return false;
+    }
+
+    int code = http.GET();
+    if (code != HTTP_CODE_OK) {
+        Debug("HTTP GET failed\r\n");
+        http.end();
+        return false;
+    }
+
+    outBody = http.getString();
+    http.end();
+    return true;
+}
+
+bool parseTopIds(const String &json, uint32_t *ids, size_t maxIds, size_t &outCount)
+{
+    outCount = 0;
+    uint32_t current = 0;
+    bool inNumber = false;
+
+    for (size_t i = 0; i < json.length(); ++i) {
+        char c = json[i];
+        if (c >= '0' && c <= '9') {
+            current = current * 10 + static_cast<uint32_t>(c - '0');
+            inNumber = true;
+        } else if (inNumber) {
+            ids[outCount++] = current;
+            if (outCount >= maxIds) {
+                return true;
+            }
+            current = 0;
+            inNumber = false;
         }
     }
-    if (maxValue == 0) {
-        maxValue = 1;
+
+    if (inNumber && outCount < maxIds) {
+        ids[outCount++] = current;
     }
-
-    constexpr UWORD originX = 28;
-    constexpr UWORD originY = 110;
-    constexpr UWORD chartHeight = 64;
-    constexpr UWORD barWidth = 16;
-    constexpr UWORD spacing = 6;
-
-    Paint_DrawLine(originX, originY - chartHeight, originX, originY, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-    Paint_DrawLine(originX, originY, originX + (barWidth + spacing) * (sizeof(values) / sizeof(values[0])) + 8,
-                   originY, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-
-    for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i) {
-        UWORD barHeight = static_cast<UWORD>((values[i] * chartHeight) / maxValue);
-        UWORD left = originX + spacing + i * (barWidth + spacing);
-        UWORD right = left + barWidth;
-        UWORD barBottom = originY - 2;
-        UWORD barTop = (barHeight >= 2U) ? static_cast<UWORD>(originY - barHeight) : static_cast<UWORD>(barBottom - 1);
-        Paint_DrawRectangle(left, barTop, right, barBottom, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-
-        char label[4];
-        snprintf(label, sizeof(label), "%02u", static_cast<unsigned>(i * 3));
-        Paint_DrawString_EN(left, originY + 4, label, &Font8, BLACK, WHITE);
-    }
-
-    Paint_DrawString_EN(originX, originY - chartHeight - 14, "Hourly samples (0-60)", &Font12, BLACK, WHITE);
-    pushFull(true);
-    DEV_Delay_ms(kMediumHoldMs);
+    return outCount > 0;
 }
 
-void sceneBitmapShowcase()
+bool decodeJsonString(const String &json, size_t valueStart, char *buffer, size_t bufferLen)
 {
-    prepareCanvas();
-    Paint_DrawBitMap(gImage_2in13);
+    if (bufferLen == 0) {
+        return false;
+    }
+    size_t j = 0;
+    bool inEscape = false;
 
-    Paint_DrawRectangle(0, 0, Paint.Width - 1, 26, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    Paint_DrawString_EN(6, 4, "Bitmap Overlay", &Font16, WHITE, BLACK);
-
-    Paint_ClearWindows(Paint.Width - 120, 34, Paint.Width - 12, 118, WHITE);
-    Paint_DrawRectangle(Paint.Width - 120, 34, Paint.Width - 12, 118, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawString_EN(Paint.Width - 112, 42, "Blend raw bitmaps", &Font12, BLACK, WHITE);
-    Paint_DrawString_EN(Paint.Width - 112, 56, "with live widgets", &Font12, BLACK, WHITE);
-    Paint_DrawString_EN(Paint.Width - 112, 70, "for rich layouts.", &Font12, BLACK, WHITE);
-    Paint_DrawString_EN(Paint.Width - 112, 92, "Try icons, maps,", &Font12, BLACK, WHITE);
-    Paint_DrawString_EN(Paint.Width - 112, 106, "and photo frames.", &Font12, BLACK, WHITE);
-
-    pushFull(false);
-    DEV_Delay_ms(kLongHoldMs);
-}
-
-void sceneProgressPartial()
-{
-    prepareCanvas();
-    drawHeader("Partial Refresh");
-    Paint_DrawString_EN(20, 40, "Progress indicator", &Font16, BLACK, WHITE);
-    Paint_DrawString_EN(20, 58, "Fast updates without flicker", &Font12, BLACK, WHITE);
-
-    constexpr UWORD barLeft = 32;
-    constexpr UWORD barTop = 72;
-    const UWORD barRight = (Paint.Width > 32) ? static_cast<UWORD>(Paint.Width - 32) : Paint.Width;
-    constexpr UWORD barBottom = 92;
-    Paint_DrawRectangle(barLeft, barTop, barRight, barBottom, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-
-    EPD_2in13_V4_Init();
-    EPD_2in13_V4_Display_Base(sFrame);
-    DEV_Delay_ms(250);
-
-    for (int percent = 0; percent <= 100; percent += 20) {
-        Paint_ClearWindows(barLeft + 2, barTop + 2, barRight - 2, barBottom - 2, WHITE);
-        UWORD fillWidth = static_cast<UWORD>((barRight - barLeft - 4) * percent / 100);
-        if (fillWidth > 0) {
-            Paint_DrawRectangle(barLeft + 2, barTop + 2, barLeft + 2 + fillWidth, barBottom - 2,
-                                BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    for (size_t i = valueStart; i < json.length(); ++i) {
+        char c = json[i];
+        if (inEscape) {
+            char decoded = c;
+            switch (c) {
+                case '"':
+                case '\\':
+                case '/':
+                    decoded = c;
+                    break;
+                case 'n':
+                case 'r':
+                    decoded = ' ';
+                    break;
+                case 't':
+                    decoded = ' ';
+                    break;
+                default:
+                    decoded = ' ';
+                    break;
+            }
+            if (j + 1 < bufferLen) {
+                buffer[j++] = decoded;
+            }
+            inEscape = false;
+            continue;
         }
 
-        char label[8];
-        snprintf(label, sizeof(label), "%3d%%", percent);
-        Paint_ClearWindows(barRight - 58, barTop + 4, barRight - 8, barBottom - 4, WHITE);
-        Paint_DrawString_EN(barRight - 58, barTop + 4, label, &Font12, BLACK, WHITE);
-
-        EPD_2in13_V4_Display_Partial(sFrame);
-        DEV_Delay_ms(600);
+        if (c == '\\') {
+            inEscape = true;
+            continue;
+        }
+        if (c == '"') {
+            break;
+        }
+        if (j + 1 < bufferLen) {
+            buffer[j++] = c;
+        }
     }
 
-    DEV_Delay_ms(900);
+    buffer[j] = '\0';
+    return j > 0;
 }
 
-void sceneClockPartial()
+void sanitizeAscii(char *text)
 {
-    prepareCanvas();
-    drawHeader("Live Clock");
-    Paint_DrawString_EN(20, 40, "Digital time", &Font16, BLACK, WHITE);
+    size_t len = strlen(text);
+    size_t readIdx = 0;
+    size_t writeIdx = 0;
+    while (readIdx < len) {
+        unsigned char c = static_cast<unsigned char>(text[readIdx]);
+        if (c < 32 || c == 127) {
+            text[writeIdx++] = ' ';
+            ++readIdx;
+            continue;
+        }
+        if (c >= 128) {
+            text[writeIdx++] = '?';
+            ++readIdx;
+            // Skip continuation bytes (UTF-8)
+            while (readIdx < len) {
+                unsigned char next = static_cast<unsigned char>(text[readIdx]);
+                if ((next & 0xC0) != 0x80) {
+                    break;
+                }
+                ++readIdx;
+            }
+            continue;
+        }
+        text[writeIdx++] = static_cast<char>(c);
+        ++readIdx;
+    }
+    text[writeIdx] = '\0';
+}
 
-    constexpr UWORD timeBoxLeft = 110;
-    constexpr UWORD timeBoxTop = 50;
-    const UWORD timeBoxRight = (Paint.Width > 18) ? static_cast<UWORD>(Paint.Width - 18) : Paint.Width;
-    const UWORD timeBoxBottom = static_cast<UWORD>(timeBoxTop + Font24.Height + 12);
-    Paint_DrawRectangle(timeBoxLeft - 6, timeBoxTop - 6, timeBoxRight, timeBoxBottom,
-                        BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
+bool extractTitle(const String &json, char *buffer, size_t bufferLen)
+{
+    const char *key = "\"title\"";
+    int keyIndex = json.indexOf(key);
+    if (keyIndex < 0) {
+        return false;
+    }
+    int colonIndex = json.indexOf(':', keyIndex + strlen(key));
+    if (colonIndex < 0) {
+        return false;
+    }
+    int quoteIndex = json.indexOf('"', colonIndex);
+    if (quoteIndex < 0) {
+        return false;
+    }
+    return decodeJsonString(json, static_cast<size_t>(quoteIndex + 1), buffer, bufferLen);
+}
 
-    constexpr UWORD secondsLeft = 20;
-    constexpr UWORD secondsTop = 78;
-    constexpr UWORD secondsRight = 100;
-    constexpr UWORD secondsBottom = 110;
-    Paint_DrawRectangle(secondsLeft, secondsTop, secondsRight, secondsBottom,
-                        BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawString_EN(secondsLeft + 4, secondsTop - 16, "Second fill", &Font12, BLACK, WHITE);
+bool fetchStory(uint32_t id, Story &story)
+{
+    String url;
+    url.reserve(128);
+    url = kItemEndpointPrefix;
+    url += id;
+    url += kItemEndpointSuffix;
 
-    EPD_2in13_V4_Init();
-    EPD_2in13_V4_Display_Base(sFrame);
-    DEV_Delay_ms(250);
+    String body;
+    if (!httpGet(url.c_str(), body)) {
+        return false;
+    }
 
-    PAINT_TIME clock{};
-    clock.Year = 2024;
-    clock.Month = 1;
-    clock.Day = 1;
-    clock.Hour = 10;
-    clock.Min = 58;
-    clock.Sec = 50;
+    if (!extractTitle(body, story.title, sizeof(story.title))) {
+        strncpy(story.title, "(untitled)", sizeof(story.title));
+        story.title[sizeof(story.title) - 1] = '\0';
+    }
+    sanitizeAscii(story.title);
+    story.id = id;
+    return true;
+}
 
-    for (int tick = 0; tick < 12; ++tick) {
-        clock.Sec += 1;
-        if (clock.Sec >= 60) {
-            clock.Sec = 0;
-            clock.Min += 1;
-            if (clock.Min >= 60) {
-                clock.Min = 0;
-                clock.Hour = (clock.Hour + 1) % 24;
+size_t drawWrappedText(UWORD x, UWORD y, const char *text, UWORD maxWidth, sFONT *font)
+{
+    if (text == nullptr || font == nullptr || maxWidth < font->Width) {
+        return 0;
+    }
+
+    const UWORD maxCharsPerLine = maxWidth / font->Width;
+    const UWORD lineHeight = font->Height + 2;
+    size_t linesDrawn = 0;
+
+    const char *ptr = text;
+    char lineBuf[80];
+
+    while (*ptr != '\0') {
+        size_t len = 0;
+        size_t lastSpace = SIZE_MAX;
+        while (ptr[len] != '\0' && len < maxCharsPerLine) {
+            if (ptr[len] == ' ') {
+                lastSpace = len;
+            }
+            ++len;
+        }
+
+        size_t copyLen = len;
+        if (ptr[len] != '\0' && lastSpace != SIZE_MAX) {
+            copyLen = lastSpace;
+        }
+        if (copyLen == 0) {
+            copyLen = len;
+        }
+        if (copyLen >= sizeof(lineBuf)) {
+            copyLen = sizeof(lineBuf) - 1;
+        }
+
+        strncpy(lineBuf, ptr, copyLen);
+        lineBuf[copyLen] = '\0';
+        Paint_DrawString_EN(x, y, lineBuf, font, BLACK, WHITE);
+        ++linesDrawn;
+
+        ptr += copyLen;
+        while (*ptr == ' ') {
+            ++ptr;
+        }
+        if (*ptr == '\0') {
+            break;
+        }
+        y += lineHeight;
+    }
+    return linesDrawn;
+}
+
+void renderStories()
+{
+    initCanvas();
+
+    Paint_DrawRectangle(0, 0, Paint.Width - 1, 26, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
+    Paint_DrawString_EN(6, 4, "Hacker News Top Stories", &Font12, WHITE, BLACK);
+
+    if (gStoryCount == 0) {
+        Paint_DrawString_EN(20, 54, "No stories available.", &Font16, BLACK, WHITE);
+        fullRefresh(false);
+        return;
+    }
+
+    UWORD y = 32;
+    const sFONT *font = &Font12;
+    const UWORD numberColumnWidth = 20;
+    const UWORD textLeft = 14 + numberColumnWidth;
+    const UWORD textWidth = Paint.Width > textLeft + 4 ? static_cast<UWORD>(Paint.Width - textLeft - 4) : Paint.Width;
+    const UWORD lineHeight = font->Height + 4;
+
+    for (size_t i = 0; i < gStoryCount; ++i) {
+        if (y + font->Height >= Paint.Height) {
+            break;
+        }
+        char prefix[6];
+        snprintf(prefix, sizeof(prefix), "%u.", static_cast<unsigned>(i + 1));
+        Paint_DrawString_EN(14, y, prefix, &Font12, BLACK, WHITE);
+
+        size_t lines = drawWrappedText(textLeft, y, gStories[i].title, textWidth, &Font12);
+        if (lines == 0) {
+            lines = 1;
+        }
+        y += static_cast<UWORD>(lines * lineHeight);
+    }
+
+    fullRefresh(false);
+}
+
+void fetchTopStories()
+{
+    gStoryCount = 0;
+
+    uint32_t ids[kMaxStories];
+    size_t idCount = 0;
+
+    String body;
+    if (!httpGet(kTopStoriesEndpoint, body)) {
+        Debug("Failed to fetch top story IDs\r\n");
+        return;
+    }
+
+    if (!parseTopIds(body, ids, kMaxStories, idCount)) {
+        Debug("Failed to parse top story IDs\r\n");
+        return;
+    }
+
+    for (size_t i = 0; i < idCount; ++i) {
+        Story story;
+        if (fetchStory(ids[i], story)) {
+            if (gStoryCount < kMaxStories) {
+                gStories[gStoryCount++] = story;
             }
         }
-
-        Paint_ClearWindows(timeBoxLeft, timeBoxTop, timeBoxRight - 6, timeBoxBottom - 6, WHITE);
-        Paint_DrawTime(timeBoxLeft, timeBoxTop, &clock, &Font24, BLACK, WHITE);
-
-        Paint_ClearWindows(secondsLeft + 2, secondsTop + 2, secondsRight - 2, secondsBottom - 2, WHITE);
-        UWORD secFill = static_cast<UWORD>((secondsRight - secondsLeft - 4) * clock.Sec / 59);
-        if (secFill > 0) {
-            Paint_DrawRectangle(secondsLeft + 2, secondsTop + 2,
-                                secondsLeft + 2 + secFill, secondsBottom - 2,
-                                BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-        }
-
-        EPD_2in13_V4_Display_Partial(sFrame);
-        DEV_Delay_ms(750);
     }
-
-    DEV_Delay_ms(1200);
 }
 
 void cycleCleanup()
@@ -307,52 +422,47 @@ void cycleCleanup()
     EPD_2in13_V4_Init();
     EPD_2in13_V4_Clear();
     EPD_2in13_V4_Sleep();
-    DEV_Delay_ms(1500);
 }
 
-void init()
+void runOnce()
 {
-    if (!ensureFrame()) {
-        while (true) {
-            DEV_Delay_ms(1000);
-        }
-    }
-    EPD_2in13_V4_Init();
-    EPD_2in13_V4_Clear();
-    EPD_2in13_V4_Sleep();
-    DEV_Delay_ms(500);
-}
-
-void runCycle()
-{
-    if (!ensureFrame()) {
-        DEV_Delay_ms(1000);
+    if (!ensureFrameBuffer()) {
         return;
     }
 
-    printf("Running EPD scene cycle\r\n");
+    showStatus("Connecting Wi-Fi...");
+    if (!ensureWifi()) {
+        showStatus("Wi-Fi connection failed");
+        cycleCleanup();
+        return;
+    }
 
-    sceneWelcome();
-    sceneShapeGallery();
-    sceneDataWidgets();
-    sceneTrend();
-    sceneBitmapShowcase();
-    sceneProgressPartial();
-    sceneClockPartial();
+    showStatus("Fetching top stories...");
+    fetchTopStories();
 
+    if (gStoryCount == 0) {
+        showStatus("No stories fetched");
+        cycleCleanup();
+        return;
+    }
+
+    renderStories();
     cycleCleanup();
 }
 
-} // namespace demo
+}  // namespace hn
+
+// ---------- Arduino entry points ----------
 
 void setup()
 {
-    printf("EPD 2.13\" multi-scene demo\r\n");
+    Serial.begin(115200);
     DEV_Module_Init();
-    demo::init();
+    hn::runOnce();
 }
 
 void loop()
 {
-    demo::runCycle();
+    DEV_Delay_ms(hn::kRefreshIntervalMs);
+    hn::runOnce();
 }
