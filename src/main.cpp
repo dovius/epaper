@@ -67,8 +67,8 @@ void setup()
 	Paint_DrawString_EN(140, 15, "waveshare", &Font16, BLACK, WHITE);
 	Paint_DrawNum(140, 40, 123456789, &Font16, BLACK, WHITE);
 
-	Paint_DrawString_CN(140, 60, "你好abc", &Font12CN, BLACK, WHITE);
-	Paint_DrawString_CN(5, 65, "微雪电子", &Font24CN, WHITE, BLACK);
+	Paint_DrawString_EN(140, 60, "demo", &Font12, BLACK, WHITE);
+	Paint_DrawString_EN(5, 65, "demo", &Font24, WHITE, BLACK);
 
 	EPD_2in13_V4_Display_Base(BlackImage);
 	DEV_Delay_ms(3000);
@@ -124,8 +124,8 @@ void setup()
 	EPD_2in13_V4_Sleep();
 	free(BlackImage);
 	BlackImage = NULL;
-	DEV_Delay_ms(2000);//important, at least 2s
-	// close 5V
+	DEV_Delay_ms(2000);
+
 	printf("close 5V, Module enters 0 power consumption ...\r\n");
 
 }
