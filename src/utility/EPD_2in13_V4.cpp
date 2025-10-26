@@ -1,12 +1,12 @@
 /*****************************************************************************
-* | File      	:  	EPD_2in13_V4.c
-* | Author      :   Waveshare team
-* | Function    :   2.13inch e-paper V4
-* | Info        :
+* | File      :   EPD_2in13_V4.cpp
+* | Author    :   Waveshare team (original), refactored for robustness
+* | Function  :   2.13inch e-paper V4
+* | Info      :
 *----------------
-* |	This version:   V1.0
-* | Date        :   2023-8-11
-* | Info        :
+* |   This version:   V1.0
+* |   Date        :   2023-8-11
+* |   Info        :
 * -----------------------------------------------------------------------------
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -31,11 +31,16 @@
 #include "EPD_2in13_V4.h"
 #include "Debug.h"
 
-/******************************************************************************
-function :	Software reset
-parameter:
-******************************************************************************/
-static void EPD_2in13_V4_Reset(void)
+namespace {
+
+constexpr UWORD kWidth = EPD_2in13_V4_WIDTH;
+constexpr UWORD kHeight = EPD_2in13_V4_HEIGHT;
+constexpr UWORD kRowBytes = (kWidth + 7U) / 8U;
+constexpr UDOUBLE kFrameBufferSize = static_cast<UDOUBLE>(kRowBytes) * kHeight;
+constexpr uint32_t kBusyPollIntervalMs = 2U;
+constexpr uint32_t kBusyDefaultTimeoutMs = 4000U;
+
+void hardware_reset()
 {
     DEV_Digital_Write(EPD_RST_PIN, 1);
     DEV_Delay_ms(20);
@@ -45,326 +50,234 @@ static void EPD_2in13_V4_Reset(void)
     DEV_Delay_ms(20);
 }
 
-/******************************************************************************
-function :	send command
-parameter:
-     Reg : Command register
-******************************************************************************/
-static void EPD_2in13_V4_SendCommand(UBYTE Reg)
+inline void send_command(UBYTE command)
 {
     DEV_Digital_Write(EPD_DC_PIN, 0);
-    DEV_Digital_Write(EPD_CS_PIN, 0);
-    DEV_SPI_WriteByte(Reg);
-    DEV_Digital_Write(EPD_CS_PIN, 1);
+    DEV_SPI_WriteByte(command);
 }
 
-/******************************************************************************
-function :	send data
-parameter:
-    Data : Write data
-******************************************************************************/
-static void EPD_2in13_V4_SendData(UBYTE Data)
+inline void send_data_byte(UBYTE data)
 {
     DEV_Digital_Write(EPD_DC_PIN, 1);
-    DEV_Digital_Write(EPD_CS_PIN, 0);
-    DEV_SPI_WriteByte(Data);
-    DEV_Digital_Write(EPD_CS_PIN, 1);
+    DEV_SPI_WriteByte(data);
 }
 
-/******************************************************************************
-function :	Wait until the busy_pin goes LOW
-parameter:
-******************************************************************************/
-void EPD_2in13_V4_ReadBusy(void)
+inline void send_data_buffer(const UBYTE *data, UDOUBLE length)
+{
+    if (data == nullptr || length == 0) {
+        return;
+    }
+    DEV_Digital_Write(EPD_DC_PIN, 1);
+    DEV_SPI_Write_nByte(data, length);
+}
+
+inline void send_command_with_data(UBYTE command, const UBYTE *data, size_t length)
+{
+    send_command(command);
+    if (data != nullptr && length > 0) {
+        send_data_buffer(data, static_cast<UDOUBLE>(length));
+    }
+}
+
+bool wait_while_busy(uint32_t timeout_ms = kBusyDefaultTimeoutMs)
 {
     Debug("e-Paper busy\r\n");
-	while(1)
-	{	 //=1 BUSY
-		if(DEV_Digital_Read(EPD_BUSY_PIN)==0) 
-			break;
-		DEV_Delay_ms(10);
-	}
-	DEV_Delay_ms(10);
+    const uint32_t start = millis();
+    while (DEV_Digital_Read(EPD_BUSY_PIN) == 1) {
+        DEV_Delay_ms(kBusyPollIntervalMs);
+        if (timeout_ms > 0 && (millis() - start) >= timeout_ms) {
+            Debug("e-Paper busy timeout\r\n");
+            return false;
+        }
+    }
+    DEV_Delay_ms(10);
     Debug("e-Paper busy release\r\n");
+    return true;
 }
 
-/******************************************************************************
-function :	Setting the display window
-parameter:
-	Xstart : X-axis starting position
-	Ystart : Y-axis starting position
-	Xend : End position of X-axis
-	Yend : End position of Y-axis
-******************************************************************************/
-static void EPD_2in13_V4_SetWindows(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend)
+inline void trigger_display_update(UBYTE control)
 {
-    EPD_2in13_V4_SendCommand(0x44); // SET_RAM_X_ADDRESS_START_END_POSITION
-    EPD_2in13_V4_SendData((Xstart>>3) & 0xFF);
-    EPD_2in13_V4_SendData((Xend>>3) & 0xFF);
-	
-    EPD_2in13_V4_SendCommand(0x45); // SET_RAM_Y_ADDRESS_START_END_POSITION
-    EPD_2in13_V4_SendData(Ystart & 0xFF);
-    EPD_2in13_V4_SendData((Ystart >> 8) & 0xFF);
-    EPD_2in13_V4_SendData(Yend & 0xFF);
-    EPD_2in13_V4_SendData((Yend >> 8) & 0xFF);
+    send_command_with_data(0x22, &control, 1);
+    send_command(0x20);
+    wait_while_busy();
 }
 
-/******************************************************************************
-function :	Set Cursor
-parameter:
-	Xstart : X-axis starting position
-	Ystart : Y-axis starting position
-******************************************************************************/
-static void EPD_2in13_V4_SetCursor(UWORD Xstart, UWORD Ystart)
+void set_window(UWORD x_start, UWORD y_start, UWORD x_end, UWORD y_end)
 {
-    EPD_2in13_V4_SendCommand(0x4E); // SET_RAM_X_ADDRESS_COUNTER
-    EPD_2in13_V4_SendData(Xstart & 0xFF);
-
-    EPD_2in13_V4_SendCommand(0x4F); // SET_RAM_Y_ADDRESS_COUNTER
-    EPD_2in13_V4_SendData(Ystart & 0xFF);
-    EPD_2in13_V4_SendData((Ystart >> 8) & 0xFF);
+    const UBYTE x_data[] = {
+        static_cast<UBYTE>((x_start >> 3) & 0xFF),
+        static_cast<UBYTE>((x_end >> 3) & 0xFF)
+    };
+    const UBYTE y_data[] = {
+        static_cast<UBYTE>(y_start & 0xFF),
+        static_cast<UBYTE>((y_start >> 8) & 0xFF),
+        static_cast<UBYTE>(y_end & 0xFF),
+        static_cast<UBYTE>((y_end >> 8) & 0xFF)
+    };
+    send_command_with_data(0x44, x_data, sizeof(x_data));
+    send_command_with_data(0x45, y_data, sizeof(y_data));
 }
 
-/******************************************************************************
-function :	Turn On Display
-parameter:
-******************************************************************************/
-static void EPD_2in13_V4_TurnOnDisplay(void)
+void set_cursor(UWORD x, UWORD y)
 {
-	EPD_2in13_V4_SendCommand(0x22); // Display Update Control
-	EPD_2in13_V4_SendData(0xf7);
-	EPD_2in13_V4_SendCommand(0x20); // Activate Display Update Sequence
-	EPD_2in13_V4_ReadBusy();
+    const UBYTE x_data = static_cast<UBYTE>(x & 0xFF);
+    const UBYTE y_data[] = {
+        static_cast<UBYTE>(y & 0xFF),
+        static_cast<UBYTE>((y >> 8) & 0xFF)
+    };
+    send_command_with_data(0x4E, &x_data, 1);
+    send_command_with_data(0x4F, y_data, sizeof(y_data));
 }
 
-static void EPD_2in13_V4_TurnOnDisplay_Fast(void)
+inline void set_full_window()
 {
-	EPD_2in13_V4_SendCommand(0x22); // Display Update Control
-	EPD_2in13_V4_SendData(0xc7);	// fast:0x0c, quality:0x0f, 0xcf
-	EPD_2in13_V4_SendCommand(0x20); // Activate Display Update Sequence
-	EPD_2in13_V4_ReadBusy();
+    set_window(0, 0, kWidth - 1, kHeight - 1);
+    set_cursor(0, 0);
 }
 
-static void EPD_2in13_V4_TurnOnDisplay_Partial(void)
+void write_image_ram(UBYTE command, const UBYTE *image)
 {
-	EPD_2in13_V4_SendCommand(0x22); // Display Update Control
-	EPD_2in13_V4_SendData(0xff);	// fast:0x0c, quality:0x0f, 0xcf
-	EPD_2in13_V4_SendCommand(0x20); // Activate Display Update Sequence
-	EPD_2in13_V4_ReadBusy();
+    if (image == nullptr) {
+        return;
+    }
+    send_command(command);
+    send_data_buffer(image, kFrameBufferSize);
 }
 
-/******************************************************************************
-function :	Initialize the e-Paper register
-parameter:
-******************************************************************************/
+void fill_image_ram(UBYTE command, UBYTE value)
+{
+    UBYTE line[kRowBytes];
+    for (UWORD col = 0; col < kRowBytes; ++col) {
+        line[col] = value;
+    }
+    send_command(command);
+    DEV_Digital_Write(EPD_DC_PIN, 1);
+    for (UWORD row = 0; row < kHeight; ++row) {
+        DEV_SPI_Write_nByte(line, kRowBytes);
+    }
+}
+
+}  // namespace
+
 void EPD_2in13_V4_Init(void)
 {
-	EPD_2in13_V4_Reset();
+    hardware_reset();
 
-	EPD_2in13_V4_ReadBusy();   
-	EPD_2in13_V4_SendCommand(0x12);  //SWRESET
-	EPD_2in13_V4_ReadBusy();   
-		
-	EPD_2in13_V4_SendCommand(0x01); //Driver output control      
-	EPD_2in13_V4_SendData(0xF9);
-	EPD_2in13_V4_SendData(0x00);
-	EPD_2in13_V4_SendData(0x00);
+    wait_while_busy();
+    send_command(0x12);  // SWRESET
+    wait_while_busy();
 
-	EPD_2in13_V4_SendCommand(0x11); //data entry mode       
-	EPD_2in13_V4_SendData(0x03);
+    const UBYTE driver_output[] = {0xF9, 0x00, 0x00};
+    send_command_with_data(0x01, driver_output, sizeof(driver_output));
 
-	EPD_2in13_V4_SetWindows(0, 0, EPD_2in13_V4_WIDTH-1, EPD_2in13_V4_HEIGHT-1);
-	EPD_2in13_V4_SetCursor(0, 0);
+    const UBYTE data_entry_mode = 0x03;
+    send_command_with_data(0x11, &data_entry_mode, 1);
 
-	EPD_2in13_V4_SendCommand(0x3C); //BorderWavefrom
-	EPD_2in13_V4_SendData(0x05);	
-		
-	EPD_2in13_V4_SendCommand(0x21); //  Display update control
-	EPD_2in13_V4_SendData(0x00);		
-	EPD_2in13_V4_SendData(0x80);	
-		
-	EPD_2in13_V4_SendCommand(0x18); //Read built-in temperature sensor
-	EPD_2in13_V4_SendData(0x80);	
-	EPD_2in13_V4_ReadBusy();  
+    set_full_window();
+
+    const UBYTE border_control = 0x05;
+    send_command_with_data(0x3C, &border_control, 1);
+
+    const UBYTE display_update_control[] = {0x00, 0x80};
+    send_command_with_data(0x21, display_update_control, sizeof(display_update_control));
+
+    const UBYTE temp_sensor_control = 0x80;
+    send_command_with_data(0x18, &temp_sensor_control, 1);
+    wait_while_busy();
 }
 
 void EPD_2in13_V4_Init_Fast(void)
 {
-	EPD_2in13_V4_Reset();
+    hardware_reset();
 
-	EPD_2in13_V4_SendCommand(0x12);  //SWRESET
-	EPD_2in13_V4_ReadBusy();   
+    send_command(0x12);  // SWRESET
+    wait_while_busy();
 
-	EPD_2in13_V4_SendCommand(0x18); //Read built-in temperature sensor
-	EPD_2in13_V4_SendData(0x80);
+    const UBYTE temp_sensor_control = 0x80;
+    send_command_with_data(0x18, &temp_sensor_control, 1);
 
-	EPD_2in13_V4_SendCommand(0x11); //data entry mode       
-	EPD_2in13_V4_SendData(0x03);
+    const UBYTE data_entry_mode = 0x03;
+    send_command_with_data(0x11, &data_entry_mode, 1);
 
-	EPD_2in13_V4_SetWindows(0, 0, EPD_2in13_V4_WIDTH-1, EPD_2in13_V4_HEIGHT-1);
-	EPD_2in13_V4_SetCursor(0, 0);	
-		
-	EPD_2in13_V4_SendCommand(0x22); // Load temperature value
-	EPD_2in13_V4_SendData(0xB1);		
-	EPD_2in13_V4_SendCommand(0x20);	
-	EPD_2in13_V4_ReadBusy();   
+    set_full_window();
 
-	EPD_2in13_V4_SendCommand(0x1A); // Write to temperature register
-	EPD_2in13_V4_SendData(0x64);		
-	EPD_2in13_V4_SendData(0x00);	
-					
-	EPD_2in13_V4_SendCommand(0x22); // Load temperature value
-	EPD_2in13_V4_SendData(0x91);		
-	EPD_2in13_V4_SendCommand(0x20);	
-	EPD_2in13_V4_ReadBusy();   
+    trigger_display_update(0xB1);  // Load temperature
+
+    const UBYTE temp_register[] = {0x64, 0x00};
+    send_command_with_data(0x1A, temp_register, sizeof(temp_register));
+
+    trigger_display_update(0x91);  // Apply temperature
 }
 
-/******************************************************************************
-function :	Clear screen
-parameter:
-******************************************************************************/
+void EPD_2in13_V4_Init_GUI(void)
+{
+    EPD_2in13_V4_Init();
+    const UBYTE border_control = 0x80;
+    send_command_with_data(0x3C, &border_control, 1);
+}
+
 void EPD_2in13_V4_Clear(void)
 {
-	UWORD Width, Height;
-    Width = (EPD_2in13_V4_WIDTH % 8 == 0)? (EPD_2in13_V4_WIDTH / 8 ): (EPD_2in13_V4_WIDTH / 8 + 1);
-    Height = EPD_2in13_V4_HEIGHT;
-	
-    EPD_2in13_V4_SendCommand(0x24);
-    for (UWORD j = 0; j < Height; j++) {
-        for (UWORD i = 0; i < Width; i++) {
-            EPD_2in13_V4_SendData(0XFF);
-        }
-    }	
-
-	EPD_2in13_V4_TurnOnDisplay();
+    fill_image_ram(0x24, 0xFF);
+    trigger_display_update(0xF7);
 }
 
 void EPD_2in13_V4_Clear_Black(void)
 {
-	UWORD Width, Height;
-    Width = (EPD_2in13_V4_WIDTH % 8 == 0)? (EPD_2in13_V4_WIDTH / 8 ): (EPD_2in13_V4_WIDTH / 8 + 1);
-    Height = EPD_2in13_V4_HEIGHT;
-	
-    EPD_2in13_V4_SendCommand(0x24);
-    for (UWORD j = 0; j < Height; j++) {
-        for (UWORD i = 0; i < Width; i++) {
-            EPD_2in13_V4_SendData(0X00);
-        }
-    }	
-
-	EPD_2in13_V4_TurnOnDisplay();
+    fill_image_ram(0x24, 0x00);
+    trigger_display_update(0xF7);
 }
 
-/******************************************************************************
-function :	Sends the image buffer in RAM to e-Paper and displays
-parameter:
-	Image : Image data
-******************************************************************************/
-void EPD_2in13_V4_Display(UBYTE *Image)
+void EPD_2in13_V4_Display(const UBYTE *Image)
 {
-	UWORD Width, Height;
-    Width = (EPD_2in13_V4_WIDTH % 8 == 0)? (EPD_2in13_V4_WIDTH / 8 ): (EPD_2in13_V4_WIDTH / 8 + 1);
-    Height = EPD_2in13_V4_HEIGHT;
-	
-    EPD_2in13_V4_SendCommand(0x24);
-    for (UWORD j = 0; j < Height; j++) {
-        for (UWORD i = 0; i < Width; i++) {
-            EPD_2in13_V4_SendData(Image[i + j * Width]);
-        }
-    }	
-	
-	EPD_2in13_V4_TurnOnDisplay();	
+    write_image_ram(0x24, Image);
+    trigger_display_update(0xF7);
 }
 
-void EPD_2in13_V4_Display_Fast(UBYTE *Image)
+void EPD_2in13_V4_Display_Fast(const UBYTE *Image)
 {
-	UWORD Width, Height;
-    Width = (EPD_2in13_V4_WIDTH % 8 == 0)? (EPD_2in13_V4_WIDTH / 8 ): (EPD_2in13_V4_WIDTH / 8 + 1);
-    Height = EPD_2in13_V4_HEIGHT;
-	
-    EPD_2in13_V4_SendCommand(0x24);
-    for (UWORD j = 0; j < Height; j++) {
-        for (UWORD i = 0; i < Width; i++) {
-            EPD_2in13_V4_SendData(Image[i + j * Width]);
-        }
-    }	
-	
-	EPD_2in13_V4_TurnOnDisplay_Fast();	
+    write_image_ram(0x24, Image);
+    trigger_display_update(0xC7);
 }
 
-
-/******************************************************************************
-function :	Refresh a base image
-parameter:
-	Image : Image data	
-******************************************************************************/
-void EPD_2in13_V4_Display_Base(UBYTE *Image)
-{  
-	UWORD Width, Height;
-    Width = (EPD_2in13_V4_WIDTH % 8 == 0)? (EPD_2in13_V4_WIDTH / 8 ): (EPD_2in13_V4_WIDTH / 8 + 1);
-    Height = EPD_2in13_V4_HEIGHT;
-	
-	EPD_2in13_V4_SendCommand(0x24);   //Write Black and White image to RAM
-    for (UWORD j = 0; j < Height; j++) {
-        for (UWORD i = 0; i < Width; i++) {        
-			EPD_2in13_V4_SendData(Image[i + j * Width]);
-		}
-	}
-	EPD_2in13_V4_SendCommand(0x26);   //Write Black and White image to RAM
-    for (UWORD j = 0; j < Height; j++) {
-        for (UWORD i = 0; i < Width; i++) {
-			EPD_2in13_V4_SendData(Image[i + j * Width]);
-		}
-	}
-	EPD_2in13_V4_TurnOnDisplay();	
-}
-
-/******************************************************************************
-function :	Sends the image buffer in RAM to e-Paper and partial refresh
-parameter:
-	Image : Image data
-******************************************************************************/
-void EPD_2in13_V4_Display_Partial(UBYTE *Image)
+void EPD_2in13_V4_Display_Base(const UBYTE *Image)
 {
-	UWORD Width, Height;
-    Width = (EPD_2in13_V4_WIDTH % 8 == 0)? (EPD_2in13_V4_WIDTH / 8 ): (EPD_2in13_V4_WIDTH / 8 + 1);
-    Height = EPD_2in13_V4_HEIGHT;
-	
-	//Reset
+    if (Image == nullptr) {
+        return;
+    }
+    write_image_ram(0x24, Image);
+    write_image_ram(0x26, Image);
+    trigger_display_update(0xF7);
+}
+
+void EPD_2in13_V4_Display_Partial(const UBYTE *Image)
+{
+    if (Image == nullptr) {
+        return;
+    }
+
     DEV_Digital_Write(EPD_RST_PIN, 0);
     DEV_Delay_ms(1);
     DEV_Digital_Write(EPD_RST_PIN, 1);
 
-	EPD_2in13_V4_SendCommand(0x3C); //BorderWavefrom
-	EPD_2in13_V4_SendData(0x80);	
+    const UBYTE border_control = 0x80;
+    send_command_with_data(0x3C, &border_control, 1);
 
-	EPD_2in13_V4_SendCommand(0x01); //Driver output control      
-	EPD_2in13_V4_SendData(0xF9);
-	EPD_2in13_V4_SendData(0x00);
-	EPD_2in13_V4_SendData(0x00);
-	
-	EPD_2in13_V4_SendCommand(0x11); //data entry mode       
-	EPD_2in13_V4_SendData(0x03);
+    const UBYTE driver_output[] = {0xF9, 0x00, 0x00};
+    send_command_with_data(0x01, driver_output, sizeof(driver_output));
 
-	EPD_2in13_V4_SetWindows(0, 0, EPD_2in13_V4_WIDTH-1, EPD_2in13_V4_HEIGHT-1);
-	EPD_2in13_V4_SetCursor(0, 0);
+    const UBYTE data_entry_mode = 0x03;
+    send_command_with_data(0x11, &data_entry_mode, 1);
 
-	EPD_2in13_V4_SendCommand(0x24);   //Write Black and White image to RAM
-    for (UWORD j = 0; j < Height; j++) {
-        for (UWORD i = 0; i < Width; i++) {
-			EPD_2in13_V4_SendData(Image[i + j * Width]);
-		}
-	}
-	EPD_2in13_V4_TurnOnDisplay_Partial();
+    set_full_window();
+
+    write_image_ram(0x24, Image);
+    trigger_display_update(0xFF);
 }
 
-/******************************************************************************
-function :	Enter sleep mode
-parameter:
-******************************************************************************/
 void EPD_2in13_V4_Sleep(void)
 {
-	EPD_2in13_V4_SendCommand(0x10); //enter deep sleep
-	EPD_2in13_V4_SendData(0x01); 
-	DEV_Delay_ms(100);
+    const UBYTE deep_sleep = 0x01;
+    send_command_with_data(0x10, &deep_sleep, 1);
+    DEV_Delay_ms(100);
 }

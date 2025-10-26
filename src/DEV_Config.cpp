@@ -77,24 +77,30 @@ UBYTE DEV_Module_Init(void)
 function:
 			SPI read and write
 ******************************************************************************/
+namespace {
+static inline void spi_write_byte(UBYTE data)
+{
+    for (int i = 0; i < 8; ++i) {
+        if ((data & 0x80) == 0) {
+            digitalWrite(EPD_MOSI_PIN, GPIO_PIN_RESET);
+        } else {
+            digitalWrite(EPD_MOSI_PIN, GPIO_PIN_SET);
+        }
+        data <<= 1;
+        digitalWrite(EPD_SCK_PIN, GPIO_PIN_SET);
+        digitalWrite(EPD_SCK_PIN, GPIO_PIN_RESET);
+    }
+}
+}  // namespace
+
 void DEV_SPI_WriteByte(UBYTE data)
 {
     //SPI.beginTransaction(spi_settings);
     digitalWrite(EPD_CS_PIN, GPIO_PIN_RESET);
-
-    for (int i = 0; i < 8; i++)
-    {
-        if ((data & 0x80) == 0) digitalWrite(EPD_MOSI_PIN, GPIO_PIN_RESET); 
-        else                    digitalWrite(EPD_MOSI_PIN, GPIO_PIN_SET);
-
-        data <<= 1;
-        digitalWrite(EPD_SCK_PIN, GPIO_PIN_SET);     
-        digitalWrite(EPD_SCK_PIN, GPIO_PIN_RESET);
-    }
-
+    spi_write_byte(data);
     //SPI.transfer(data);
     digitalWrite(EPD_CS_PIN, GPIO_PIN_SET);
-    //SPI.endTransaction();	
+    //SPI.endTransaction();
 }
 
 UBYTE DEV_SPI_ReadByte()
@@ -116,8 +122,14 @@ UBYTE DEV_SPI_ReadByte()
     return j;
 }
 
-void DEV_SPI_Write_nByte(UBYTE *pData, UDOUBLE len)
+void DEV_SPI_Write_nByte(const UBYTE *pData, UDOUBLE len)
 {
-    for (int i = 0; i < len; i++)
-        DEV_SPI_WriteByte(pData[i]);
+    if (pData == nullptr || len == 0) {
+        return;
+    }
+    digitalWrite(EPD_CS_PIN, GPIO_PIN_RESET);
+    for (UDOUBLE i = 0; i < len; ++i) {
+        spi_write_byte(pData[i]);
+    }
+    digitalWrite(EPD_CS_PIN, GPIO_PIN_SET);
 }
