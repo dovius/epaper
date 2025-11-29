@@ -1,0 +1,51 @@
+{
+  "rotation_enabled": true,
+  "rotation_interval": 60,
+  "rotation_order": [
+    "stocks",
+    "bitcoin",
+    "weather",
+    "notifications",
+    "network",
+    "system"
+  ],
+  "current_scene_idx": 5,
+  "scenes": {
+    "stocks": {
+      "enabled": true,
+      "interval": 60,
+      "priority": 10,
+      "settings": {}
+    },
+    "bitcoin": {
+      "enabled": true,
+      "interval": 60,
+      "priority": 10,
+      "settings": {}
+    },
+    "weather": {
+      "enabled": true,
+      "interval": 60,
+      "priority": 10,
+      "settings": {}
+    },
+    "notifications": {
+      "enabled": true,
+      "interval": 60,
+      "priority": 10,
+      "settings": {}
+    },
+    "network": {
+      "enabled": true,
+      "interval": 60,
+      "priority": 10,
+      "settings": {}
+    },
+    "system": {
+      "enabled": true,
+      "interval": 60,
+      "priority": 10,
+      "settings": {}
+    }
+  }
+}

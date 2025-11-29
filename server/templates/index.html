@@ -3,277 +3,516 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Paper Control Center</title>
+    <title>E-Paper Scene Manager</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+        
         :root {
-            --bg-dark: #0f0f1a;
-            --bg-card: #1a1a2e;
-            --bg-input: #0d0d15;
-            --accent: #00d4ff;
-            --accent-dim: #0099b8;
-            --success: #00ff88;
-            --error: #ff4757;
-            --warning: #ffa502;
-            --text: #e8e8e8;
-            --text-dim: #888;
-            --border: #2a2a4a;
+            --bg: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-hover: #1a1a25;
+            --bg-input: #08080c;
+            --accent: #22d3ee;
+            --accent-dim: #0891b2;
+            --accent-glow: rgba(34, 211, 238, 0.15);
+            --success: #4ade80;
+            --error: #f87171;
+            --warning: #fbbf24;
+            --text: #f1f5f9;
+            --text-dim: #64748b;
+            --text-muted: #475569;
+            --border: #1e293b;
+            --border-bright: #334155;
         }
         
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body {
-            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-dark);
+            font-family: 'Space Grotesk', system-ui, sans-serif;
+            background: var(--bg);
             color: var(--text);
             min-height: 100vh;
-            line-height: 1.6;
+            background-image: 
+                radial-gradient(ellipse at 0% 0%, rgba(34, 211, 238, 0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 100% 100%, rgba(139, 92, 246, 0.03) 0%, transparent 50%);
         }
         
         /* Header */
         .header {
-            background: linear-gradient(135deg, var(--bg-card), #252550);
+            background: linear-gradient(180deg, var(--bg-card), transparent);
             border-bottom: 1px solid var(--border);
-            padding: 1.5rem 2rem;
+            padding: 1rem 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
         }
         
         .logo {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
         
         .logo-icon {
-            font-size: 2rem;
+            font-size: 1.5rem;
+            filter: drop-shadow(0 0 8px var(--accent));
         }
         
         .logo h1 {
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 600;
-            background: linear-gradient(90deg, var(--accent), var(--success));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--accent);
+            letter-spacing: -0.5px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
         }
         
         .status-badge {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            border-radius: 20px;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
             background: var(--bg-input);
             border: 1px solid var(--border);
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
         }
         
         .status-dot {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
         
-        .status-dot.online { background: var(--success); }
+        .status-dot.online { background: var(--success); box-shadow: 0 0 8px var(--success); }
         .status-dot.offline { background: var(--error); }
         
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         
-        /* Main Layout */
-        .main {
-            display: grid;
-            grid-template-columns: 1fr 350px;
-            gap: 24px;
-            padding: 24px;
+        /* Layout */
+        .container {
             max-width: 1400px;
             margin: 0 auto;
+            padding: 1.5rem;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 1.5rem;
         }
         
         @media (max-width: 1024px) {
-            .main {
-                grid-template-columns: 1fr;
-            }
+            .grid { grid-template-columns: 1fr; }
         }
         
         /* Cards */
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 20px;
+            border-radius: 12px;
+            overflow: hidden;
         }
         
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
+            padding: 1rem 1.25rem;
             border-bottom: 1px solid var(--border);
+            background: linear-gradient(180deg, var(--bg-hover), transparent);
         }
         
         .card-title {
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-size: 1.1rem;
+            gap: 8px;
             font-weight: 600;
+            font-size: 0.95rem;
         }
         
-        .card-icon {
-            font-size: 1.3rem;
+        .card-body { padding: 1rem 1.25rem; }
+        
+        /* Scene List */
+        .scene-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .scene-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .scene-item:hover {
+            border-color: var(--border-bright);
+            background: var(--bg-hover);
+        }
+        
+        .scene-item.active {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+        
+        .scene-item.disabled {
+            opacity: 0.5;
+        }
+        
+        .scene-icon {
+            font-size: 1.5rem;
+            width: 40px;
+            text-align: center;
+        }
+        
+        .scene-info { flex: 1; }
+        
+        .scene-name {
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+        
+        .scene-desc {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+        
+        .scene-actions {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .scene-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        
+        .scene-badge.current {
+            background: var(--accent);
+            color: var(--bg);
+        }
+        
+        .scene-badge.error {
+            background: var(--error);
+            color: #fff;
         }
         
         /* Preview */
         .preview-container {
             background: var(--bg-input);
             border: 2px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
+            border-radius: 8px;
+            padding: 1rem;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 300px;
+            min-height: 280px;
         }
         
         .preview-image {
             max-width: 100%;
             border-radius: 4px;
             image-rendering: pixelated;
-            background: white;
+            background: #fff;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
         
         .preview-placeholder {
+            text-align: center;
             color: var(--text-dim);
+        }
+        
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 16px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-card);
+            color: var(--text);
+            font-family: inherit;
+        }
+        
+        .btn:hover:not(:disabled) {
+            border-color: var(--border-bright);
+            background: var(--bg-hover);
+        }
+        
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--bg);
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: var(--accent-dim);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+        
+        .btn-sm { padding: 6px 10px; font-size: 0.8rem; }
+        
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            font-size: 1.1rem;
+        }
+        
+        /* Rotation Controls */
+        .rotation-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 1rem;
+            background: var(--bg-input);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .rotation-toggle {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            background: var(--border);
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .rotation-toggle.active {
+            background: var(--accent);
+        }
+        
+        .rotation-toggle::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        
+        .rotation-toggle.active::after {
+            transform: translateX(22px);
+        }
+        
+        .rotation-info {
+            flex: 1;
+        }
+        
+        .rotation-label {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        
+        .rotation-status {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .interval-input {
+            width: 70px;
+            padding: 6px 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
             text-align: center;
         }
         
-        /* Forms */
+        .interval-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        /* Settings Panel */
+        .settings-panel {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-top: 1rem;
+            overflow: hidden;
+        }
+        
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+        }
+        
+        .settings-header:hover {
+            background: var(--bg-hover);
+        }
+        
+        .settings-content {
+            padding: 16px;
+            display: none;
+        }
+        
+        .settings-content.open {
+            display: block;
+        }
+        
         .form-group {
             margin-bottom: 16px;
+        }
+        
+        .form-group:last-child {
+            margin-bottom: 0;
         }
         
         label {
             display: block;
             margin-bottom: 6px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: var(--text-dim);
         }
         
         input[type="text"],
+        input[type="password"],
         input[type="number"],
-        textarea,
         select {
             width: 100%;
-            padding: 12px 14px;
-            background: var(--bg-input);
+            padding: 10px 12px;
+            background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 6px;
             color: var(--text);
-            font-size: 0.95rem;
-            transition: border-color 0.2s;
+            font-size: 0.9rem;
+            font-family: inherit;
         }
         
-        input:focus,
-        textarea:focus,
-        select:focus {
+        input:focus, select:focus {
             outline: none;
             border-color: var(--accent);
         }
         
-        textarea {
-            min-height: 100px;
-            resize: vertical;
-            font-family: inherit;
-        }
-        
-        /* Buttons */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 12px 20px;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, var(--accent), var(--accent-dim));
-            color: #000;
-        }
-        
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
-        }
-        
-        .btn-secondary {
-            background: var(--bg-input);
-            color: var(--text);
-            border: 1px solid var(--border);
-        }
-        
-        .btn-secondary:hover:not(:disabled) {
-            background: var(--border);
-        }
-        
-        .btn-danger {
-            background: linear-gradient(135deg, var(--error), #cc3d4a);
-            color: #fff;
-        }
-        
-        .btn-success {
-            background: linear-gradient(135deg, var(--success), #00cc6a);
-            color: #000;
-        }
-        
-        .btn-block {
-            width: 100%;
-        }
-        
-        .btn-group {
+        .checkbox-group {
             display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .checkbox-group input {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+        }
+        
+        /* Device Info */
+        .device-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        
+        .device-item {
+            background: var(--bg-input);
+            padding: 10px 12px;
+            border-radius: 6px;
+        }
+        
+        .device-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .device-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--accent);
+        }
+        
+        /* Notifications */
+        .notif-form {
+            display: flex;
+            flex-direction: column;
             gap: 10px;
+        }
+        
+        .notif-input {
+            padding: 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: inherit;
+            resize: none;
+        }
+        
+        .notif-input:focus {
+            outline: none;
+            border-color: var(--accent);
         }
         
         /* Tabs */
         .tabs {
             display: flex;
             gap: 4px;
-            margin-bottom: 16px;
-            background: var(--bg-input);
             padding: 4px;
-            border-radius: 10px;
+            background: var(--bg-input);
+            border-radius: 8px;
+            margin-bottom: 1rem;
         }
         
         .tab {
             flex: 1;
-            padding: 10px 16px;
+            padding: 8px 12px;
             background: transparent;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             color: var(--text-dim);
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
-            font-weight: 500;
+            font-family: inherit;
         }
         
         .tab.active {
@@ -293,128 +532,11 @@
             display: block;
         }
         
-        /* Device Info */
-        .device-info {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-        
-        .info-item {
-            background: var(--bg-input);
-            padding: 12px;
-            border-radius: 8px;
-        }
-        
-        .info-label {
-            font-size: 0.8rem;
-            color: var(--text-dim);
-            margin-bottom: 4px;
-        }
-        
-        .info-value {
-            font-size: 1rem;
-            font-weight: 500;
-            color: var(--accent);
-        }
-        
-        /* Log */
-        .log {
-            background: var(--bg-input);
-            border-radius: 8px;
-            padding: 12px;
-            max-height: 200px;
-            overflow-y: auto;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.85rem;
-        }
-        
-        .log-entry {
-            padding: 4px 0;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        .log-entry:last-child {
-            border-bottom: none;
-        }
-        
-        .log-time {
-            color: var(--text-dim);
-        }
-        
-        .log-ok { color: var(--success); }
-        .log-error { color: var(--error); }
-        
-        /* Quick Actions */
-        .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-        }
-        
-        .quick-btn {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            padding: 16px;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            color: var(--text);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .quick-btn:hover {
-            border-color: var(--accent);
-            transform: translateY(-2px);
-        }
-        
-        .quick-btn-icon {
-            font-size: 1.5rem;
-        }
-        
-        /* Upload area */
-        .upload-area {
-            border: 2px dashed var(--border);
-            border-radius: 12px;
-            padding: 24px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .upload-area:hover,
-        .upload-area.dragover {
-            border-color: var(--accent);
-            background: rgba(0, 212, 255, 0.05);
-        }
-        
-        .upload-icon {
-            font-size: 2rem;
-            margin-bottom: 8px;
-        }
-        
-        /* Spinner */
-        .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid transparent;
-            border-top-color: currentColor;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
         /* Toast */
         .toast-container {
             position: fixed;
-            bottom: 24px;
-            right: 24px;
+            bottom: 20px;
+            right: 20px;
             z-index: 1000;
         }
         
@@ -422,20 +544,114 @@
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 12px 20px;
+            padding: 12px 16px;
             margin-top: 8px;
             display: flex;
             align-items: center;
             gap: 10px;
             animation: slideIn 0.3s ease;
+            font-size: 0.9rem;
         }
         
-        .toast.success { border-left: 4px solid var(--success); }
-        .toast.error { border-left: 4px solid var(--error); }
+        .toast.success { border-left: 3px solid var(--success); }
+        .toast.error { border-left: 3px solid var(--error); }
         
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
+        }
+        
+        /* Log */
+        .log {
+            background: var(--bg-input);
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+        
+        .log-entry {
+            padding: 3px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .log-entry:last-child { border-bottom: none; }
+        .log-time { color: var(--text-muted); }
+        .log-ok { color: var(--success); }
+        .log-error { color: var(--error); }
+        
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+        
+        .modal-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            transform: scale(0.95);
+            transition: transform 0.3s;
+        }
+        
+        .modal-overlay.open .modal {
+            transform: scale(1);
+        }
+        
+        .modal-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        
+        .modal-close:hover { color: var(--text); }
+        
+        .modal-body { padding: 1.25rem; }
+        
+        .modal-footer {
+            padding: 1rem 1.25rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
         }
     </style>
 </head>
@@ -443,256 +659,201 @@
     <header class="header">
         <div class="logo">
             <span class="logo-icon">📺</span>
-            <h1>E-Paper Control Center</h1>
+            <h1>E-Paper Scene Manager</h1>
         </div>
-        <div class="status-badge">
-            <span class="status-dot" id="statusDot"></span>
-            <span id="statusText">Checking...</span>
+        <div class="header-actions">
+            <div class="status-badge">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Connecting...</span>
+            </div>
         </div>
     </header>
     
-    <main class="main">
-        <div class="content">
-            <!-- Quick Actions -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <span class="card-icon">⚡</span>
-                        Quick Actions
-                    </div>
-                </div>
-                <div class="quick-actions">
-                    <button class="quick-btn" onclick="clearDisplay('white')">
-                        <span class="quick-btn-icon">⬜</span>
-                        <span>Clear White</span>
-                    </button>
-                    <button class="quick-btn" onclick="clearDisplay('black')">
-                        <span class="quick-btn-icon">⬛</span>
-                        <span>Clear Black</span>
-                    </button>
-                    <button class="quick-btn" onclick="showDemo()">
-                        <span class="quick-btn-icon">🎨</span>
-                        <span>Demo</span>
-                    </button>
-                    <button class="quick-btn" onclick="refreshPreview()">
-                        <span class="quick-btn-icon">🔄</span>
-                        <span>Refresh</span>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Content Tabs -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <span class="card-icon">✏️</span>
-                        Send Content
+    <div class="container">
+        <div class="grid">
+            <!-- Main Content -->
+            <div class="main-content">
+                <!-- Rotation Controls -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-body">
+                        <div class="rotation-controls">
+                            <div class="rotation-toggle" id="rotationToggle" onclick="toggleRotation()"></div>
+                            <div class="rotation-info">
+                                <div class="rotation-label">Auto Rotation</div>
+                                <div class="rotation-status" id="rotationStatus">Loading...</div>
+                            </div>
+                            <span style="color: var(--text-dim); font-size: 0.85rem;">Interval:</span>
+                            <input type="number" class="interval-input" id="intervalInput" value="60" min="10" max="3600" onchange="updateInterval()">
+                            <span style="color: var(--text-dim); font-size: 0.85rem;">sec</span>
+                        </div>
+                        <div class="controls">
+                            <button class="btn btn-icon" onclick="prevScene()" title="Previous">◀</button>
+                            <button class="btn btn-primary" onclick="refreshDisplay()">
+                                🔄 Refresh Now
+                            </button>
+                            <button class="btn btn-icon" onclick="nextScene()" title="Next">▶</button>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="tabs">
-                    <button class="tab active" data-tab="text">💬 Text</button>
-                    <button class="tab" data-tab="dashboard">📊 Dashboard</button>
-                    <button class="tab" data-tab="image">🖼️ Image</button>
-                </div>
-                
-                <!-- Text Tab -->
-                <div class="tab-content active" id="tab-text">
-                    <div class="form-group">
-                        <label for="textTitle">Title</label>
-                        <input type="text" id="textTitle" value="Notification" placeholder="Header title">
+                <!-- Scene List -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span>🎬</span>
+                            Scenes
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="textMessage">Message</label>
-                        <textarea id="textMessage" placeholder="Enter your message here..."></textarea>
-                    </div>
-                    <div class="btn-group">
-                        <button class="btn btn-secondary" onclick="previewText()">Preview</button>
-                        <button class="btn btn-primary btn-block" onclick="sendText()">
-                            Send to Display
-                        </button>
+                    <div class="card-body">
+                        <div class="scene-list" id="sceneList">
+                            <!-- Scenes will be loaded here -->
+                        </div>
                     </div>
                 </div>
                 
-                <!-- Dashboard Tab -->
-                <div class="tab-content" id="tab-dashboard">
-                    <div class="form-group">
-                        <label for="dashTitle">Title</label>
-                        <input type="text" id="dashTitle" value="Dashboard" placeholder="Dashboard title">
+                <!-- Notifications -->
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span>🔔</span>
+                            Send Notification
+                        </div>
+                        <button class="btn btn-sm" onclick="clearNotifications()">Clear All</button>
                     </div>
-                    <div class="form-group">
-                        <label for="dashData">Data (JSON)</label>
-                        <textarea id="dashData" placeholder='{"Temperature": "24°C", "Humidity": "65%"}'>{
-    "Temperature": "24°C",
-    "Humidity": "65%",
-    "Status": "Online",
-    "Uptime": "2d 5h"
-}</textarea>
-                    </div>
-                    <div class="btn-group">
-                        <button class="btn btn-secondary" onclick="previewDashboard()">Preview</button>
-                        <button class="btn btn-primary btn-block" onclick="sendDashboard()">
-                            Send to Display
-                        </button>
+                    <div class="card-body">
+                        <div class="notif-form">
+                            <input type="text" id="notifTitle" placeholder="Title" class="notif-input">
+                            <textarea id="notifMessage" placeholder="Message..." class="notif-input" rows="2"></textarea>
+                            <select id="notifPriority" class="notif-input">
+                                <option value="low">Low Priority</option>
+                                <option value="normal" selected>Normal Priority</option>
+                                <option value="high">High Priority</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="sendNotification()">Send Notification</button>
+                        </div>
                     </div>
                 </div>
                 
-                <!-- Image Tab -->
-                <div class="tab-content" id="tab-image">
-                    <div class="upload-area" id="uploadArea">
-                        <div class="upload-icon">📁</div>
-                        <p>Drag & drop an image here</p>
-                        <p style="color: var(--text-dim); font-size: 0.9rem;">or click to select</p>
-                        <input type="file" id="imageFile" accept="image/*" hidden>
+                <!-- Log -->
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span>📜</span>
+                            Activity Log
+                        </div>
+                        <button class="btn btn-sm" onclick="clearLog()">Clear</button>
                     </div>
-                    <div class="btn-group" style="margin-top: 16px;">
-                        <button class="btn btn-primary btn-block" onclick="sendImage()" id="sendImageBtn" disabled>
-                            Send Image to Display
-                        </button>
+                    <div class="card-body">
+                        <div class="log" id="log">
+                            <div class="log-entry">
+                                <span class="log-time">[--:--:--]</span> Ready
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Activity Log -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <span class="card-icon">📜</span>
-                        Activity Log
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Preview -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span>👁️</span>
+                            Live Preview
+                        </div>
                     </div>
-                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="clearLog()">Clear</button>
+                    <div class="card-body">
+                        <div class="preview-container">
+                            <img src="" alt="Preview" class="preview-image" id="previewImage" style="display: none;">
+                            <div class="preview-placeholder" id="previewPlaceholder">
+                                <p>No preview</p>
+                            </div>
+                        </div>
+                        <div style="text-align: center; margin-top: 10px;">
+                            <span id="currentSceneName" style="color: var(--accent); font-weight: 500;">--</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="log" id="log">
-                    <div class="log-entry">
-                        <span class="log-time">[--:--:--]</span>
-                        Ready
+                
+                <!-- Device Settings -->
+                <div class="card" style="margin-top: 1rem;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span>⚙️</span>
+                            Device
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label>ESP32 IP Address</label>
+                            <input type="text" id="deviceIp" value="{{ device_ip }}" placeholder="192.168.1.100">
+                        </div>
+                        <button class="btn" style="width: 100%;" onclick="saveDeviceConfig()">
+                            Save & Test
+                        </button>
+                        
+                        <div class="device-grid" style="margin-top: 1rem;">
+                            <div class="device-item">
+                                <div class="device-label">IP</div>
+                                <div class="device-value" id="infoIp">-</div>
+                            </div>
+                            <div class="device-item">
+                                <div class="device-label">Signal</div>
+                                <div class="device-value" id="infoRssi">-</div>
+                            </div>
+                            <div class="device-item">
+                                <div class="device-label">Uptime</div>
+                                <div class="device-value" id="infoUptime">-</div>
+                            </div>
+                            <div class="device-item">
+                                <div class="device-label">RAM</div>
+                                <div class="device-value" id="infoRam">-</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-        
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <!-- Preview -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <span class="card-icon">👁️</span>
-                        Preview
-                    </div>
+    </div>
+    
+    <!-- Scene Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span id="modalIcon">⚙️</span>
+                    <span id="modalTitle">Scene Settings</span>
                 </div>
-                <div class="preview-container">
-                    <img src="" alt="Preview" class="preview-image" id="previewImage" style="display: none;">
-                    <div class="preview-placeholder" id="previewPlaceholder">
-                        <p>No preview yet</p>
-                        <p style="font-size: 0.9rem;">Send content to see preview</p>
-                    </div>
-                </div>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
-            
-            <!-- Device Settings -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <span class="card-icon">⚙️</span>
-                        Device Settings
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="deviceIp">ESP32 IP Address</label>
-                    <input type="text" id="deviceIp" value="{{ device_ip }}" placeholder="192.168.1.100">
-                </div>
-                <button class="btn btn-secondary btn-block" onclick="saveDeviceConfig()">
-                    Save & Test Connection
-                </button>
+            <div class="modal-body" id="modalBody">
+                <!-- Settings form will be generated here -->
             </div>
-            
-            <!-- Device Info -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <span class="card-icon">📡</span>
-                        Device Info
-                    </div>
-                </div>
-                <div class="device-info" id="deviceInfo">
-                    <div class="info-item">
-                        <div class="info-label">IP Address</div>
-                        <div class="info-value" id="infoIp">-</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Signal</div>
-                        <div class="info-value" id="infoRssi">-</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Uptime</div>
-                        <div class="info-value" id="infoUptime">-</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Free RAM</div>
-                        <div class="info-value" id="infoRam">-</div>
-                    </div>
-                </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSceneSettings()">Save Settings</button>
             </div>
         </div>
-    </main>
+    </div>
     
     <div class="toast-container" id="toastContainer"></div>
     
     <script>
-        // Tab switching
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                tab.classList.add('active');
-                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-            });
-        });
+        // State
+        let scenes = [];
+        let currentSceneId = null;
+        let editingSceneId = null;
         
-        // File upload
-        const uploadArea = document.getElementById('uploadArea');
-        const imageFile = document.getElementById('imageFile');
-        
-        uploadArea.addEventListener('click', () => imageFile.click());
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            if (e.dataTransfer.files.length) {
-                imageFile.files = e.dataTransfer.files;
-                handleFileSelect();
-            }
-        });
-        imageFile.addEventListener('change', handleFileSelect);
-        
-        function handleFileSelect() {
-            if (imageFile.files.length) {
-                document.getElementById('sendImageBtn').disabled = false;
-                uploadArea.innerHTML = `
-                    <div class="upload-icon">✅</div>
-                    <p>${imageFile.files[0].name}</p>
-                    <p style="color: var(--success); font-size: 0.9rem;">Ready to send</p>
-                `;
-            }
-        }
-        
-        // API functions
+        // API
         async function api(endpoint, options = {}) {
-            try {
-                const res = await fetch('/api/' + endpoint, options);
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.detail || 'Request failed');
-                return data;
-            } catch (e) {
-                throw e;
-            }
+            const res = await fetch('/api/' + endpoint, options);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Request failed');
+            return data;
         }
         
+        // Logging
         function log(message, type = 'ok') {
             const logEl = document.getElementById('log');
             const time = new Date().toLocaleTimeString();
@@ -704,15 +865,17 @@
             document.getElementById('log').innerHTML = '';
         }
         
+        // Toast
         function toast(message, type = 'success') {
             const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerHTML = `<span>${type === 'success' ? '✓' : '✗'}</span> ${message}`;
-            container.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `<span>${type === 'success' ? '✓' : '✗'}</span> ${message}`;
+            container.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
         }
         
+        // Preview
         function showPreview(url) {
             const img = document.getElementById('previewImage');
             const placeholder = document.getElementById('previewPlaceholder');
@@ -721,7 +884,307 @@
             placeholder.style.display = 'none';
         }
         
-        // Actions
+        function refreshPreview() {
+            showPreview('/api/last-image?_=' + Date.now());
+        }
+        
+        // Scene List
+        function renderSceneList() {
+            const container = document.getElementById('sceneList');
+            container.innerHTML = scenes.map(scene => `
+                <div class="scene-item ${scene.id === currentSceneId ? 'active' : ''} ${!scene.config.enabled ? 'disabled' : ''}"
+                     onclick="showScene('${scene.id}')">
+                    <div class="scene-icon">${scene.icon}</div>
+                    <div class="scene-info">
+                        <div class="scene-name">${scene.name}</div>
+                        <div class="scene-desc">${scene.description}</div>
+                    </div>
+                    <div class="scene-actions">
+                        ${scene.id === currentSceneId ? '<span class="scene-badge current">Active</span>' : ''}
+                        ${scene.last_error ? '<span class="scene-badge error">Error</span>' : ''}
+                        <button class="btn btn-sm btn-icon" onclick="event.stopPropagation(); openSettings('${scene.id}')" title="Settings">⚙️</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Load scenes
+        async function loadScenes() {
+            try {
+                const data = await api('scenes');
+                scenes = data.scenes;
+                currentSceneId = data.manager.current_scene;
+                
+                // Update rotation controls
+                const toggle = document.getElementById('rotationToggle');
+                toggle.classList.toggle('active', data.manager.rotation_enabled);
+                document.getElementById('intervalInput').value = data.manager.rotation_interval;
+                document.getElementById('rotationStatus').textContent = 
+                    data.manager.rotation_enabled ? `Every ${data.manager.rotation_interval}s` : 'Paused';
+                
+                // Update current scene name
+                const currentScene = scenes.find(s => s.id === currentSceneId);
+                document.getElementById('currentSceneName').textContent = 
+                    currentScene ? `${currentScene.icon} ${currentScene.name}` : '--';
+                
+                renderSceneList();
+            } catch (e) {
+                log('Failed to load scenes: ' + e.message, 'error');
+            }
+        }
+        
+        // Show scene
+        async function showScene(sceneId) {
+            try {
+                await api(`scenes/${sceneId}/show`, { method: 'POST' });
+                currentSceneId = sceneId;
+                renderSceneList();
+                refreshPreview();
+                
+                const scene = scenes.find(s => s.id === sceneId);
+                document.getElementById('currentSceneName').textContent = 
+                    scene ? `${scene.icon} ${scene.name}` : '--';
+                
+                toast(`Showing ${scene?.name || sceneId}`);
+                log(`Displayed scene: ${scene?.name || sceneId}`);
+            } catch (e) {
+                toast(e.message, 'error');
+                log('Show scene failed: ' + e.message, 'error');
+            }
+        }
+        
+        // Rotation
+        async function toggleRotation() {
+            const toggle = document.getElementById('rotationToggle');
+            const isActive = toggle.classList.contains('active');
+            
+            try {
+                if (isActive) {
+                    await api('rotation/stop', { method: 'POST' });
+                    toggle.classList.remove('active');
+                    document.getElementById('rotationStatus').textContent = 'Paused';
+                    log('Rotation stopped');
+                } else {
+                    await api('rotation/start', { method: 'POST' });
+                    toggle.classList.add('active');
+                    const interval = document.getElementById('intervalInput').value;
+                    document.getElementById('rotationStatus').textContent = `Every ${interval}s`;
+                    log('Rotation started');
+                }
+            } catch (e) {
+                toast(e.message, 'error');
+            }
+        }
+        
+        async function updateInterval() {
+            const interval = parseInt(document.getElementById('intervalInput').value);
+            try {
+                await api(`rotation/interval?interval=${interval}`, { method: 'POST' });
+                document.getElementById('rotationStatus').textContent = `Every ${interval}s`;
+                log(`Rotation interval set to ${interval}s`);
+            } catch (e) {
+                toast(e.message, 'error');
+            }
+        }
+        
+        async function nextScene() {
+            try {
+                const data = await api('rotation/next', { method: 'POST' });
+                currentSceneId = data.scene;
+                await loadScenes();
+                refreshPreview();
+                log('Next scene: ' + data.scene);
+            } catch (e) {
+                toast(e.message, 'error');
+            }
+        }
+        
+        async function prevScene() {
+            try {
+                const data = await api('rotation/prev', { method: 'POST' });
+                currentSceneId = data.scene;
+                await loadScenes();
+                refreshPreview();
+                log('Previous scene: ' + data.scene);
+            } catch (e) {
+                toast(e.message, 'error');
+            }
+        }
+        
+        async function refreshDisplay() {
+            try {
+                await api('display/refresh', { method: 'POST' });
+                refreshPreview();
+                toast('Display refreshed');
+                log('Display refreshed');
+            } catch (e) {
+                toast(e.message, 'error');
+                log('Refresh failed: ' + e.message, 'error');
+            }
+        }
+        
+        // Settings Modal
+        function openSettings(sceneId) {
+            editingSceneId = sceneId;
+            const scene = scenes.find(s => s.id === sceneId);
+            if (!scene) return;
+            
+            document.getElementById('modalIcon').textContent = scene.icon;
+            document.getElementById('modalTitle').textContent = scene.name + ' Settings';
+            
+            // Generate settings form
+            let html = `
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="setting-enabled" ${scene.config.enabled ? 'checked' : ''}>
+                        <label for="setting-enabled" style="margin: 0;">Enabled in rotation</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Update Interval (seconds)</label>
+                    <input type="number" id="setting-interval" value="${scene.config.interval}" min="10" max="3600">
+                </div>
+            `;
+            
+            // Add scene-specific settings
+            if (scene.settings_schema && scene.settings_schema.length > 0) {
+                html += '<hr style="border: none; border-top: 1px solid var(--border); margin: 1rem 0;">';
+                html += '<div style="font-weight: 500; margin-bottom: 1rem;">Scene Settings</div>';
+                
+                for (const setting of scene.settings_schema) {
+                    const value = scene.config.settings[setting.key] ?? setting.default;
+                    
+                    if (setting.type === 'checkbox') {
+                        html += `
+                            <div class="form-group">
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="custom-${setting.key}" ${value ? 'checked' : ''}>
+                                    <label for="custom-${setting.key}" style="margin: 0;">${setting.label}</label>
+                                </div>
+                            </div>
+                        `;
+                    } else if (setting.type === 'select') {
+                        html += `
+                            <div class="form-group">
+                                <label>${setting.label}</label>
+                                <select id="custom-${setting.key}">
+                                    ${setting.options.map(opt => 
+                                        `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`
+                                    ).join('')}
+                                </select>
+                            </div>
+                        `;
+                    } else if (setting.type === 'password') {
+                        html += `
+                            <div class="form-group">
+                                <label>${setting.label}</label>
+                                <input type="password" id="custom-${setting.key}" value="${value || ''}" placeholder="${setting.description || ''}">
+                            </div>
+                        `;
+                    } else {
+                        html += `
+                            <div class="form-group">
+                                <label>${setting.label}</label>
+                                <input type="${setting.type === 'number' ? 'number' : 'text'}" 
+                                       id="custom-${setting.key}" 
+                                       value="${value || ''}"
+                                       placeholder="${setting.description || ''}">
+                            </div>
+                        `;
+                    }
+                }
+            }
+            
+            document.getElementById('modalBody').innerHTML = html;
+            document.getElementById('settingsModal').classList.add('open');
+        }
+        
+        function closeModal() {
+            document.getElementById('settingsModal').classList.remove('open');
+            editingSceneId = null;
+        }
+        
+        async function saveSceneSettings() {
+            if (!editingSceneId) return;
+            
+            const scene = scenes.find(s => s.id === editingSceneId);
+            const config = {
+                enabled: document.getElementById('setting-enabled').checked,
+                interval: parseInt(document.getElementById('setting-interval').value),
+                settings: {}
+            };
+            
+            // Collect custom settings
+            if (scene.settings_schema) {
+                for (const setting of scene.settings_schema) {
+                    const el = document.getElementById('custom-' + setting.key);
+                    if (el) {
+                        if (setting.type === 'checkbox') {
+                            config.settings[setting.key] = el.checked;
+                        } else if (setting.type === 'number') {
+                            config.settings[setting.key] = parseInt(el.value);
+                        } else {
+                            config.settings[setting.key] = el.value;
+                        }
+                    }
+                }
+            }
+            
+            try {
+                await api(`scenes/${editingSceneId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                toast('Settings saved');
+                log(`Updated ${scene.name} settings`);
+                closeModal();
+                await loadScenes();
+            } catch (e) {
+                toast(e.message, 'error');
+            }
+        }
+        
+        // Notifications
+        async function sendNotification() {
+            const title = document.getElementById('notifTitle').value;
+            const message = document.getElementById('notifMessage').value;
+            const priority = document.getElementById('notifPriority').value;
+            
+            if (!title || !message) {
+                toast('Please fill in title and message', 'error');
+                return;
+            }
+            
+            try {
+                await api('notifications', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, message, priority })
+                });
+                
+                document.getElementById('notifTitle').value = '';
+                document.getElementById('notifMessage').value = '';
+                
+                toast('Notification added');
+                log(`Notification: ${title}`);
+            } catch (e) {
+                toast(e.message, 'error');
+            }
+        }
+        
+        async function clearNotifications() {
+            try {
+                await api('notifications', { method: 'DELETE' });
+                toast('Notifications cleared');
+                log('Cleared all notifications');
+            } catch (e) {
+                toast(e.message, 'error');
+            }
+        }
+        
+        // Device
         async function checkDeviceStatus() {
             try {
                 const data = await api('device/status');
@@ -754,137 +1217,27 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ip })
                 });
-                toast('Configuration saved');
-                log('Device IP set to: ' + ip);
+                toast('Device config saved');
+                log('Device IP: ' + ip);
                 checkDeviceStatus();
             } catch (e) {
                 toast(e.message, 'error');
-                log('Config failed: ' + e.message, 'error');
             }
-        }
-        
-        async function clearDisplay(color) {
-            try {
-                await api('display/clear?white=' + (color === 'white'), { method: 'POST' });
-                toast('Display cleared');
-                log('Display cleared to ' + color);
-                refreshPreview();
-            } catch (e) {
-                toast(e.message, 'error');
-                log('Clear failed: ' + e.message, 'error');
-            }
-        }
-        
-        async function sendText() {
-            const title = document.getElementById('textTitle').value;
-            const text = document.getElementById('textMessage').value;
-            
-            if (!text.trim()) {
-                toast('Please enter a message', 'error');
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('title', title);
-            formData.append('text', text);
-            
-            try {
-                await api('display/text', { method: 'POST', body: formData });
-                toast('Text sent successfully');
-                log('Sent text: ' + text.substring(0, 30) + '...');
-                refreshPreview();
-            } catch (e) {
-                toast(e.message, 'error');
-                log('Send failed: ' + e.message, 'error');
-            }
-        }
-        
-        function previewText() {
-            const title = document.getElementById('textTitle').value;
-            const content = document.getElementById('textMessage').value;
-            showPreview(`/api/preview?type=text&title=${encodeURIComponent(title)}&content=${encodeURIComponent(content)}&_=${Date.now()}`);
-        }
-        
-        async function sendDashboard() {
-            const title = document.getElementById('dashTitle').value;
-            const data = document.getElementById('dashData').value;
-            
-            try {
-                JSON.parse(data); // Validate JSON
-            } catch {
-                toast('Invalid JSON data', 'error');
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('title', title);
-            formData.append('data', data);
-            
-            try {
-                await api('display/dashboard', { method: 'POST', body: formData });
-                toast('Dashboard sent successfully');
-                log('Sent dashboard: ' + title);
-                refreshPreview();
-            } catch (e) {
-                toast(e.message, 'error');
-                log('Send failed: ' + e.message, 'error');
-            }
-        }
-        
-        function previewDashboard() {
-            const title = document.getElementById('dashTitle').value;
-            const content = document.getElementById('dashData').value;
-            showPreview(`/api/preview?type=dashboard&title=${encodeURIComponent(title)}&content=${encodeURIComponent(content)}&_=${Date.now()}`);
-        }
-        
-        async function sendImage() {
-            const file = document.getElementById('imageFile').files[0];
-            if (!file) {
-                toast('Please select an image', 'error');
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            try {
-                await api('display/image', { method: 'POST', body: formData });
-                toast('Image sent successfully');
-                log('Sent image: ' + file.name);
-                refreshPreview();
-            } catch (e) {
-                toast(e.message, 'error');
-                log('Send failed: ' + e.message, 'error');
-            }
-        }
-        
-        async function showDemo() {
-            const demoData = {
-                "🌡️ Temp": "24.5°C",
-                "💧 Humidity": "65%",
-                "📡 Signal": "-42 dBm",
-                "⏱️ Uptime": "3d 12h"
-            };
-            
-            document.getElementById('dashData').value = JSON.stringify(demoData, null, 4);
-            document.getElementById('dashTitle').value = "Smart Home";
-            
-            // Switch to dashboard tab
-            document.querySelectorAll('.tab')[1].click();
-            previewDashboard();
-        }
-        
-        function refreshPreview() {
-            showPreview('/api/last-image?_=' + Date.now());
         }
         
         // Initialize
-        checkDeviceStatus();
-        setInterval(checkDeviceStatus, 10000);
+        async function init() {
+            await loadScenes();
+            await checkDeviceStatus();
+            refreshPreview();
+            
+            // Periodic updates
+            setInterval(checkDeviceStatus, 10000);
+            setInterval(loadScenes, 30000);
+            setInterval(refreshPreview, 60000);
+        }
         
-        // Try to load last image
-        refreshPreview();
+        init();
     </script>
 </body>
 </html>
-

@@ -11,6 +11,7 @@ import asyncio
 import io
 import json
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -23,35 +24,22 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from PIL import Image, ImageDraw, ImageFont
 
-# Configure logging
+from scene_manager import SceneManager
+from scenes import NotificationsScene, SystemScene
+
+# ============================================================================
+# Configuration
+# ============================================================================
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Display configuration
 DISPLAY_WIDTH = 122
 DISPLAY_HEIGHT = 250
 FRAME_BUFFER_SIZE = ((DISPLAY_WIDTH + 7) // 8) * DISPLAY_HEIGHT
 
-# Server configuration
-ESP32_DEFAULT_IP = "192.168.1.100"
+ESP32_DEFAULT_IP = "192.168.1.231"
 TIMEOUT = 30
-
-app = FastAPI(
-    title="E-Paper Display Server",
-    description="Generate and send images to ESP32 e-paper display",
-    version="1.0.0"
-)
-
-# Templates
-templates_dir = Path(__file__).parent / "templates"
-templates_dir.mkdir(exist_ok=True)
-templates = Jinja2Templates(directory=str(templates_dir))
-
-# Static files
-static_dir = Path(__file__).parent / "static"
-static_dir.mkdir(exist_ok=True)
-if static_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 # ============================================================================
@@ -62,25 +50,22 @@ class DeviceConfig(BaseModel):
     ip: str = ESP32_DEFAULT_IP
     port: int = 80
 
-class TextWidget(BaseModel):
-    text: str
-    x: int = 10
-    y: int = 10
-    font_size: int = 16
-    bold: bool = False
 
-class DashboardConfig(BaseModel):
-    title: str = "Dashboard"
-    widgets: list[dict] = []
+class SceneConfigUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    interval: Optional[int] = None
+    priority: Optional[int] = None
+    settings: Optional[dict] = None
 
-# Global state
-device_config = DeviceConfig()
-last_image: Optional[bytes] = None
-last_update: Optional[datetime] = None
+
+class NotificationCreate(BaseModel):
+    title: str
+    message: str
+    priority: str = "normal"
 
 
 # ============================================================================
-# Image Generation
+# Image Generator
 # ============================================================================
 
 class ImageGenerator:
@@ -95,19 +80,15 @@ class ImageGenerator:
         """Load fonts with fallbacks"""
         self.fonts = {}
         
-        # Try to load nice fonts, fall back to default
         font_paths = [
-            # Windows
             "C:/Windows/Fonts/consola.ttf",
             "C:/Windows/Fonts/arial.ttf",
-            # Linux
             "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-            # macOS
             "/System/Library/Fonts/Menlo.ttc",
         ]
         
-        for size in [8, 10, 12, 14, 16, 18, 20, 24, 28, 32]:
+        for size in [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32]:
             font = None
             for path in font_paths:
                 try:
@@ -125,7 +106,6 @@ class ImageGenerator:
         """Get font by size (or nearest available)"""
         if size in self.fonts:
             return self.fonts[size]
-        # Find nearest
         available = sorted(self.fonts.keys())
         nearest = min(available, key=lambda x: abs(x - size))
         return self.fonts[nearest]
@@ -146,9 +126,7 @@ class ImageGenerator:
     def draw_header(self, img: Image.Image, title: str) -> Image.Image:
         """Draw header bar"""
         draw = ImageDraw.Draw(img)
-        # Black header bar
         draw.rectangle([0, 0, self.width, 24], fill=0)
-        # White text
         font = self.get_font(16)
         draw.text((8, 4), title, font=font, fill=1)
         return img
@@ -159,26 +137,6 @@ class ImageGenerator:
         draw.line([(0, y), (self.width, y)], fill=0, width=1)
         return img
     
-    def draw_dashboard(self, title: str, lines: list[tuple[str, str]]) -> Image.Image:
-        """Draw a dashboard with title and key-value lines"""
-        img = self.create_blank()
-        self.draw_header(img, title)
-        
-        draw = ImageDraw.Draw(img)
-        y = 30
-        font_label = self.get_font(12)
-        font_value = self.get_font(14)
-        
-        for label, value in lines:
-            draw.text((8, y), label, font=font_label, fill=0)
-            draw.text((8, y + 14), value, font=font_value, fill=0)
-            y += 34
-            
-            if y > self.height - 20:
-                break
-        
-        return img
-    
     def draw_notification(self, title: str, message: str, 
                           timestamp: Optional[str] = None) -> Image.Image:
         """Draw a notification card"""
@@ -186,9 +144,9 @@ class ImageGenerator:
         self.draw_header(img, title)
         
         draw = ImageDraw.Draw(img)
-        
-        # Message with word wrap
         font = self.get_font(14)
+        
+        # Word wrap
         words = message.split()
         lines = []
         current_line = ""
@@ -206,45 +164,23 @@ class ImageGenerator:
             lines.append(current_line)
         
         y = 32
-        for line in lines[:6]:  # Max 6 lines
+        for line in lines[:6]:
             draw.text((8, y), line, font=font, fill=0)
             y += 18
         
-        # Timestamp at bottom
         if timestamp:
             font_small = self.get_font(10)
             draw.text((8, self.height - 16), timestamp, font=font_small, fill=0)
         
         return img
     
-    def draw_multiline(self, title: str, text: str) -> Image.Image:
-        """Draw multiple lines of text"""
-        img = self.create_blank()
-        self.draw_header(img, title)
-        
-        draw = ImageDraw.Draw(img)
-        font = self.get_font(12)
-        
-        lines = text.split('\n')
-        y = 30
-        for line in lines:
-            if y > self.height - 16:
-                break
-            draw.text((8, y), line, font=font, fill=0)
-            y += 16
-        
-        return img
-    
     def to_raw_bytes(self, img: Image.Image) -> bytes:
         """Convert image to raw bytes for e-paper"""
-        # Ensure 1-bit mode
         if img.mode != '1':
             img = img.convert('1')
         
-        # Rotate for display orientation
         img = img.rotate(-90, expand=True)
         
-        # Create raw buffer
         raw = bytearray(FRAME_BUFFER_SIZE)
         pixels = img.load()
         
@@ -259,12 +195,19 @@ class ImageGenerator:
         return bytes(raw)
 
 
-# Global generator
+# ============================================================================
+# Global State
+# ============================================================================
+
 generator = ImageGenerator()
+device_config = DeviceConfig()
+scene_manager: Optional[SceneManager] = None
+last_image: Optional[bytes] = None
+last_update: Optional[datetime] = None
 
 
 # ============================================================================
-# ESP32 Client
+# ESP32 Communication
 # ============================================================================
 
 async def send_to_esp32(data: bytes, ip: str = None, port: int = 80) -> dict:
@@ -298,7 +241,58 @@ async def get_esp32_status(ip: str = None, port: int = 80) -> dict:
 
 
 # ============================================================================
-# API Routes
+# App Lifecycle
+# ============================================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """App startup/shutdown"""
+    global scene_manager
+    
+    # Initialize
+    SystemScene.init_start_time()
+    scene_manager = SceneManager(generator)
+    scene_manager.set_send_callback(send_to_esp32)
+    
+    # Start rotation if enabled
+    if scene_manager.rotation_enabled:
+        scene_manager.start_rotation()
+    
+    logger.info("E-Paper server started")
+    
+    yield
+    
+    # Cleanup
+    if scene_manager:
+        scene_manager.stop_rotation()
+    
+    logger.info("E-Paper server stopped")
+
+
+# ============================================================================
+# FastAPI App
+# ============================================================================
+
+app = FastAPI(
+    title="E-Paper Display Server",
+    description="Generate and send images to ESP32 e-paper display",
+    version="2.0.0",
+    lifespan=lifespan,
+)
+
+# Templates & Static
+templates_dir = Path(__file__).parent / "templates"
+templates_dir.mkdir(exist_ok=True)
+templates = Jinja2Templates(directory=str(templates_dir))
+
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(exist_ok=True)
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
+# ============================================================================
+# Page Routes
 # ============================================================================
 
 @app.get("/", response_class=HTMLResponse)
@@ -310,6 +304,10 @@ async def index(request: Request):
         "last_update": last_update.isoformat() if last_update else None
     })
 
+
+# ============================================================================
+# Device API
+# ============================================================================
 
 @app.get("/api/device/status")
 async def api_device_status():
@@ -326,14 +324,208 @@ async def api_device_config(config: DeviceConfig):
     """Update device configuration"""
     global device_config
     device_config = config
-    return {"status": "ok", "config": config.dict()}
+    return {"status": "ok", "config": config.model_dump()}
 
 
 @app.get("/api/device/config")
 async def api_get_device_config():
     """Get current device configuration"""
-    return device_config.dict()
+    return device_config.model_dump()
 
+
+# ============================================================================
+# Scene Manager API
+# ============================================================================
+
+@app.get("/api/scenes")
+async def api_get_scenes():
+    """Get all scenes and their configurations"""
+    return {
+        "scenes": scene_manager.get_all_scenes_info(),
+        "manager": scene_manager.get_status(),
+    }
+
+
+@app.get("/api/scenes/{scene_id}")
+async def api_get_scene(scene_id: str):
+    """Get specific scene info"""
+    if scene_id not in scene_manager.scenes:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    return scene_manager.scenes[scene_id].get_info()
+
+
+@app.patch("/api/scenes/{scene_id}")
+async def api_update_scene(scene_id: str, config: SceneConfigUpdate):
+    """Update scene configuration"""
+    config_dict = config.model_dump(exclude_none=True)
+    if not scene_manager.update_scene_config(scene_id, config_dict):
+        raise HTTPException(status_code=404, detail="Scene not found")
+    return {"status": "ok", "scene": scene_manager.scenes[scene_id].get_info()}
+
+
+@app.post("/api/scenes/{scene_id}/show")
+async def api_show_scene(scene_id: str):
+    """Render and send a specific scene to display"""
+    global last_image, last_update
+    
+    img = await scene_manager.render_scene(scene_id)
+    if img is None:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    
+    raw = generator.to_raw_bytes(img)
+    
+    try:
+        result = await send_to_esp32(raw)
+        last_image = raw
+        last_update = datetime.now()
+        scene_manager.set_scene(scene_id)
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/scenes/{scene_id}/preview")
+async def api_preview_scene(scene_id: str):
+    """Get preview image of a scene"""
+    img = await scene_manager.render_scene(scene_id)
+    if img is None:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    
+    buf = io.BytesIO()
+    preview = img.resize((img.width * 2, img.height * 2), Image.Resampling.NEAREST)
+    preview.save(buf, format='PNG')
+    buf.seek(0)
+    
+    return StreamingResponse(buf, media_type="image/png")
+
+
+# ============================================================================
+# Scene Rotation API
+# ============================================================================
+
+@app.get("/api/rotation")
+async def api_get_rotation():
+    """Get rotation status"""
+    return scene_manager.get_status()
+
+
+@app.post("/api/rotation/start")
+async def api_start_rotation():
+    """Start scene rotation"""
+    scene_manager.rotation_enabled = True
+    scene_manager.start_rotation()
+    scene_manager.save_config()
+    return {"status": "ok", "rotation_enabled": True}
+
+
+@app.post("/api/rotation/stop")
+async def api_stop_rotation():
+    """Stop scene rotation"""
+    scene_manager.rotation_enabled = False
+    scene_manager.stop_rotation()
+    scene_manager.save_config()
+    return {"status": "ok", "rotation_enabled": False}
+
+
+@app.post("/api/rotation/next")
+async def api_next_scene():
+    """Go to next scene"""
+    global last_image, last_update
+    
+    scene_id = scene_manager.next_scene()
+    img = await scene_manager.render_current_scene()
+    
+    if img:
+        raw = generator.to_raw_bytes(img)
+        try:
+            result = await send_to_esp32(raw)
+            last_image = raw
+            last_update = datetime.now()
+            return {"status": "ok", "scene": scene_id}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"status": "ok", "scene": scene_id}
+
+
+@app.post("/api/rotation/prev")
+async def api_prev_scene():
+    """Go to previous scene"""
+    global last_image, last_update
+    
+    scene_id = scene_manager.prev_scene()
+    img = await scene_manager.render_current_scene()
+    
+    if img:
+        raw = generator.to_raw_bytes(img)
+        try:
+            result = await send_to_esp32(raw)
+            last_image = raw
+            last_update = datetime.now()
+            return {"status": "ok", "scene": scene_id}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    return {"status": "ok", "scene": scene_id}
+
+
+@app.post("/api/rotation/interval")
+async def api_set_interval(interval: int):
+    """Set rotation interval in seconds"""
+    scene_manager.rotation_interval = max(10, min(3600, interval))
+    scene_manager.save_config()
+    return {"status": "ok", "interval": scene_manager.rotation_interval}
+
+
+@app.put("/api/rotation/order")
+async def api_set_order(order: list[str]):
+    """Update scene rotation order"""
+    if not scene_manager.update_rotation_order(order):
+        raise HTTPException(status_code=400, detail="Invalid scene IDs in order")
+    return {"status": "ok", "order": order}
+
+
+# ============================================================================
+# Notifications API
+# ============================================================================
+
+@app.get("/api/notifications")
+async def api_get_notifications():
+    """Get all notifications"""
+    return {
+        "notifications": NotificationsScene._notifications,
+        "unread_count": NotificationsScene.get_unread_count(),
+    }
+
+
+@app.post("/api/notifications")
+async def api_add_notification(notif: NotificationCreate):
+    """Add a notification"""
+    NotificationsScene.add_notification(
+        title=notif.title,
+        message=notif.message,
+        priority=notif.priority,
+    )
+    return {"status": "ok", "unread_count": NotificationsScene.get_unread_count()}
+
+
+@app.delete("/api/notifications")
+async def api_clear_notifications():
+    """Clear all notifications"""
+    NotificationsScene.clear_notifications()
+    return {"status": "ok"}
+
+
+@app.post("/api/notifications/{notif_id}/read")
+async def api_mark_notification_read(notif_id: int):
+    """Mark notification as read"""
+    NotificationsScene.mark_read(notif_id)
+    return {"status": "ok"}
+
+
+# ============================================================================
+# Display Control API
+# ============================================================================
 
 @app.post("/api/display/clear")
 async def api_clear_display(white: bool = True):
@@ -376,43 +568,15 @@ async def api_display_text(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/display/dashboard")
-async def api_display_dashboard(
-    title: str = Form("Dashboard"),
-    data: str = Form(...)  # JSON string of key-value pairs
-):
-    """Display dashboard with key-value pairs"""
-    global last_image, last_update
-    
-    try:
-        items = json.loads(data)
-        lines = [(k, str(v)) for k, v in items.items()]
-    except:
-        raise HTTPException(status_code=400, detail="Invalid JSON data")
-    
-    img = generator.draw_dashboard(title, lines)
-    raw = generator.to_raw_bytes(img)
-    
-    try:
-        result = await send_to_esp32(raw)
-        last_image = raw
-        last_update = datetime.now()
-        return {"status": "ok", "result": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.post("/api/display/image")
 async def api_display_image(file: UploadFile = File(...)):
     """Upload and display custom image"""
     global last_image, last_update
     
     try:
-        # Read and process image
         content = await file.read()
         img = Image.open(io.BytesIO(content))
         
-        # Resize to display dimensions
         img = img.resize((generator.width, generator.height), Image.Resampling.LANCZOS)
         img = img.convert('1')
         
@@ -427,33 +591,37 @@ async def api_display_image(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/preview")
-async def api_preview(
-    type: str = "text",
-    title: str = "Preview",
-    content: str = "Hello World"
-):
-    """Generate preview image (returns PNG)"""
-    if type == "text":
-        img = generator.draw_notification(title, content)
-    elif type == "dashboard":
-        try:
-            data = json.loads(content)
-            lines = [(k, str(v)) for k, v in data.items()]
-        except:
-            lines = [("Content", content)]
-        img = generator.draw_dashboard(title, lines)
-    else:
-        img = generator.draw_multiline(title, content)
+@app.get("/api/display/current")
+async def api_get_current():
+    """Get current scene and render it"""
+    scene = scene_manager.get_current_scene()
+    if not scene:
+        return {"scene": None}
     
-    # Convert to PNG
-    buf = io.BytesIO()
-    # Scale up for preview
-    preview = img.resize((img.width * 2, img.height * 2), Image.Resampling.NEAREST)
-    preview.save(buf, format='PNG')
-    buf.seek(0)
+    return {
+        "scene": scene.get_info(),
+        "manager": scene_manager.get_status(),
+    }
+
+
+@app.post("/api/display/refresh")
+async def api_refresh_display():
+    """Refresh current scene on display"""
+    global last_image, last_update
     
-    return StreamingResponse(buf, media_type="image/png")
+    img = await scene_manager.render_current_scene()
+    if img is None:
+        raise HTTPException(status_code=404, detail="No scene to render")
+    
+    raw = generator.to_raw_bytes(img)
+    
+    try:
+        result = await send_to_esp32(raw)
+        last_image = raw
+        last_update = datetime.now()
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/last-image")
@@ -462,7 +630,6 @@ async def api_last_image():
     if last_image is None:
         raise HTTPException(status_code=404, detail="No image sent yet")
     
-    # Recreate image from raw bytes
     img = Image.new('1', (DISPLAY_WIDTH, DISPLAY_HEIGHT), 1)
     pixels = img.load()
     
@@ -490,4 +657,3 @@ async def api_last_image():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
