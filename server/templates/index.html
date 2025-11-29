@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Paper Control Center</title>
+    <style>
+        :root {
+            --bg-dark: #0f0f1a;
+            --bg-card: #1a1a2e;
+            --bg-input: #0d0d15;
+            --accent: #00d4ff;
+            --accent-dim: #0099b8;
+            --success: #00ff88;
+            --error: #ff4757;
+            --warning: #ffa502;
+            --text: #e8e8e8;
+            --text-dim: #888;
+            --border: #2a2a4a;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--bg-card), #252550);
+            border-bottom: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo-icon {
+            font-size: 2rem;
+        }
+        
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(90deg, var(--accent), var(--success));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.online { background: var(--success); }
+        .status-dot.offline { background: var(--error); }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Main Layout */
+        .main {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 24px;
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        @media (max-width: 1024px) {
+            .main {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .card-icon {
+            font-size: 1.3rem;
+        }
+        
+        /* Preview */
+        .preview-container {
+            background: var(--bg-input);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            border-radius: 4px;
+            image-rendering: pixelated;
+            background: white;
+        }
+        
+        .preview-placeholder {
+            color: var(--text-dim);
+            text-align: center;
+        }
+        
+        /* Forms */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+            color: var(--text-dim);
+        }
+        
+        input[type="text"],
+        input[type="number"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+        
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+            color: #000;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-input);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--border);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, var(--error), #cc3d4a);
+            color: #fff;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, var(--success), #00cc6a);
+            color: #000;
+        }
+        
+        .btn-block {
+            width: 100%;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            background: var(--bg-input);
+            padding: 4px;
+            border-radius: 10px;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 10px 16px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        
+        .tab.active {
+            background: var(--bg-card);
+            color: var(--accent);
+        }
+        
+        .tab:hover:not(.active) {
+            color: var(--text);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Device Info */
+        .device-info {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        
+        .info-item {
+            background: var(--bg-input);
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        .info-label {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin-bottom: 4px;
+        }
+        
+        .info-value {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--accent);
+        }
+        
+        /* Log */
+        .log {
+            background: var(--bg-input);
+            border-radius: 8px;
+            padding: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+        }
+        
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        
+        .log-time {
+            color: var(--text-dim);
+        }
+        
+        .log-ok { color: var(--success); }
+        .log-error { color: var(--error); }
+        
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        
+        .quick-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-btn:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+        
+        .quick-btn-icon {
+            font-size: 1.5rem;
+        }
+        
+        /* Upload area */
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .upload-area:hover,
+        .upload-area.dragover {
+            border-color: var(--accent);
+            background: rgba(0, 212, 255, 0.05);
+        }
+        
+        .upload-icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+        
+        /* Spinner */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+        }
+        
+        .toast {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 20px;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .toast.success { border-left: 4px solid var(--success); }
+        .toast.error { border-left: 4px solid var(--error); }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <span class="logo-icon">📺</span>
+            <h1>E-Paper Control Center</h1>
+        </div>
+        <div class="status-badge">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Checking...</span>
+        </div>
+    </header>
+    
+    <main class="main">
+        <div class="content">
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">⚡</span>
+                        Quick Actions
+                    </div>
+                </div>
+                <div class="quick-actions">
+                    <button class="quick-btn" onclick="clearDisplay('white')">
+                        <span class="quick-btn-icon">⬜</span>
+                        <span>Clear White</span>
+                    </button>
+                    <button class="quick-btn" onclick="clearDisplay('black')">
+                        <span class="quick-btn-icon">⬛</span>
+                        <span>Clear Black</span>
+                    </button>
+                    <button class="quick-btn" onclick="showDemo()">
+                        <span class="quick-btn-icon">🎨</span>
+                        <span>Demo</span>
+                    </button>
+                    <button class="quick-btn" onclick="refreshPreview()">
+                        <span class="quick-btn-icon">🔄</span>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Content Tabs -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">✏️</span>
+                        Send Content
+                    </div>
+                </div>
+                
+                <div class="tabs">
+                    <button class="tab active" data-tab="text">💬 Text</button>
+                    <button class="tab" data-tab="dashboard">📊 Dashboard</button>
+                    <button class="tab" data-tab="image">🖼️ Image</button>
+                </div>
+                
+                <!-- Text Tab -->
+                <div class="tab-content active" id="tab-text">
+                    <div class="form-group">
+                        <label for="textTitle">Title</label>
+                        <input type="text" id="textTitle" value="Notification" placeholder="Header title">
+                    </div>
+                    <div class="form-group">
+                        <label for="textMessage">Message</label>
+                        <textarea id="textMessage" placeholder="Enter your message here..."></textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="previewText()">Preview</button>
+                        <button class="btn btn-primary btn-block" onclick="sendText()">
+                            Send to Display
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Dashboard Tab -->
+                <div class="tab-content" id="tab-dashboard">
+                    <div class="form-group">
+                        <label for="dashTitle">Title</label>
+                        <input type="text" id="dashTitle" value="Dashboard" placeholder="Dashboard title">
+                    </div>
+                    <div class="form-group">
+                        <label for="dashData">Data (JSON)</label>
+                        <textarea id="dashData" placeholder='{"Temperature": "24°C", "Humidity": "65%"}'>{
+    "Temperature": "24°C",
+    "Humidity": "65%",
+    "Status": "Online",
+    "Uptime": "2d 5h"
+}</textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="previewDashboard()">Preview</button>
+                        <button class="btn btn-primary btn-block" onclick="sendDashboard()">
+                            Send to Display
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Image Tab -->
+                <div class="tab-content" id="tab-image">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">📁</div>
+                        <p>Drag & drop an image here</p>
+                        <p style="color: var(--text-dim); font-size: 0.9rem;">or click to select</p>
+                        <input type="file" id="imageFile" accept="image/*" hidden>
+                    </div>
+                    <div class="btn-group" style="margin-top: 16px;">
+                        <button class="btn btn-primary btn-block" onclick="sendImage()" id="sendImageBtn" disabled>
+                            Send Image to Display
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Activity Log -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">📜</span>
+                        Activity Log
+                    </div>
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="clearLog()">Clear</button>
+                </div>
+                <div class="log" id="log">
+                    <div class="log-entry">
+                        <span class="log-time">[--:--:--]</span>
+                        Ready
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Preview -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">👁️</span>
+                        Preview
+                    </div>
+                </div>
+                <div class="preview-container">
+                    <img src="" alt="Preview" class="preview-image" id="previewImage" style="display: none;">
+                    <div class="preview-placeholder" id="previewPlaceholder">
+                        <p>No preview yet</p>
+                        <p style="font-size: 0.9rem;">Send content to see preview</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Device Settings -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">⚙️</span>
+                        Device Settings
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="deviceIp">ESP32 IP Address</label>
+                    <input type="text" id="deviceIp" value="{{ device_ip }}" placeholder="192.168.1.100">
+                </div>
+                <button class="btn btn-secondary btn-block" onclick="saveDeviceConfig()">
+                    Save & Test Connection
+                </button>
+            </div>
+            
+            <!-- Device Info -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-icon">📡</span>
+                        Device Info
+                    </div>
+                </div>
+                <div class="device-info" id="deviceInfo">
+                    <div class="info-item">
+                        <div class="info-label">IP Address</div>
+                        <div class="info-value" id="infoIp">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Signal</div>
+                        <div class="info-value" id="infoRssi">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Uptime</div>
+                        <div class="info-value" id="infoUptime">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Free RAM</div>
+                        <div class="info-value" id="infoRam">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+        
+        // File upload
+        const uploadArea = document.getElementById('uploadArea');
+        const imageFile = document.getElementById('imageFile');
+        
+        uploadArea.addEventListener('click', () => imageFile.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                imageFile.files = e.dataTransfer.files;
+                handleFileSelect();
+            }
+        });
+        imageFile.addEventListener('change', handleFileSelect);
+        
+        function handleFileSelect() {
+            if (imageFile.files.length) {
+                document.getElementById('sendImageBtn').disabled = false;
+                uploadArea.innerHTML = `
+                    <div class="upload-icon">✅</div>
+                    <p>${imageFile.files[0].name}</p>
+                    <p style="color: var(--success); font-size: 0.9rem;">Ready to send</p>
+                `;
+            }
+        }
+        
+        // API functions
+        async function api(endpoint, options = {}) {
+            try {
+                const res = await fetch('/api/' + endpoint, options);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Request failed');
+                return data;
+            } catch (e) {
+                throw e;
+            }
+        }
+        
+        function log(message, type = 'ok') {
+            const logEl = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const cls = type === 'error' ? 'log-error' : 'log-ok';
+            logEl.innerHTML = `<div class="log-entry"><span class="log-time">[${time}]</span> <span class="${cls}">${message}</span></div>` + logEl.innerHTML;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function toast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span>${type === 'success' ? '✓' : '✗'}</span> ${message}`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        function showPreview(url) {
+            const img = document.getElementById('previewImage');
+            const placeholder = document.getElementById('previewPlaceholder');
+            img.src = url;
+            img.style.display = 'block';
+            placeholder.style.display = 'none';
+        }
+        
+        // Actions
+        async function checkDeviceStatus() {
+            try {
+                const data = await api('device/status');
+                const dot = document.getElementById('statusDot');
+                const text = document.getElementById('statusText');
+                
+                if (data.status === 'online') {
+                    dot.className = 'status-dot online';
+                    text.textContent = 'Online';
+                    
+                    const device = data.device;
+                    document.getElementById('infoIp').textContent = device.ip || '-';
+                    document.getElementById('infoRssi').textContent = (device.rssi || '-') + ' dBm';
+                    document.getElementById('infoUptime').textContent = device.uptime || '-';
+                    document.getElementById('infoRam').textContent = ((device.freeHeap || 0) / 1024).toFixed(1) + ' KB';
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (e) {
+                document.getElementById('statusDot').className = 'status-dot offline';
+                document.getElementById('statusText').textContent = 'Offline';
+            }
+        }
+        
+        async function saveDeviceConfig() {
+            const ip = document.getElementById('deviceIp').value;
+            try {
+                await api('device/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip })
+                });
+                toast('Configuration saved');
+                log('Device IP set to: ' + ip);
+                checkDeviceStatus();
+            } catch (e) {
+                toast(e.message, 'error');
+                log('Config failed: ' + e.message, 'error');
+            }
+        }
+        
+        async function clearDisplay(color) {
+            try {
+                await api('display/clear?white=' + (color === 'white'), { method: 'POST' });
+                toast('Display cleared');
+                log('Display cleared to ' + color);
+                refreshPreview();
+            } catch (e) {
+                toast(e.message, 'error');
+                log('Clear failed: ' + e.message, 'error');
+            }
+        }
+        
+        async function sendText() {
+            const title = document.getElementById('textTitle').value;
+            const text = document.getElementById('textMessage').value;
+            
+            if (!text.trim()) {
+                toast('Please enter a message', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('text', text);
+            
+            try {
+                await api('display/text', { method: 'POST', body: formData });
+                toast('Text sent successfully');
+                log('Sent text: ' + text.substring(0, 30) + '...');
+                refreshPreview();
+            } catch (e) {
+                toast(e.message, 'error');
+                log('Send failed: ' + e.message, 'error');
+            }
+        }
+        
+        function previewText() {
+            const title = document.getElementById('textTitle').value;
+            const content = document.getElementById('textMessage').value;
+            showPreview(`/api/preview?type=text&title=${encodeURIComponent(title)}&content=${encodeURIComponent(content)}&_=${Date.now()}`);
+        }
+        
+        async function sendDashboard() {
+            const title = document.getElementById('dashTitle').value;
+            const data = document.getElementById('dashData').value;
+            
+            try {
+                JSON.parse(data); // Validate JSON
+            } catch {
+                toast('Invalid JSON data', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('data', data);
+            
+            try {
+                await api('display/dashboard', { method: 'POST', body: formData });
+                toast('Dashboard sent successfully');
+                log('Sent dashboard: ' + title);
+                refreshPreview();
+            } catch (e) {
+                toast(e.message, 'error');
+                log('Send failed: ' + e.message, 'error');
+            }
+        }
+        
+        function previewDashboard() {
+            const title = document.getElementById('dashTitle').value;
+            const content = document.getElementById('dashData').value;
+            showPreview(`/api/preview?type=dashboard&title=${encodeURIComponent(title)}&content=${encodeURIComponent(content)}&_=${Date.now()}`);
+        }
+        
+        async function sendImage() {
+            const file = document.getElementById('imageFile').files[0];
+            if (!file) {
+                toast('Please select an image', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                await api('display/image', { method: 'POST', body: formData });
+                toast('Image sent successfully');
+                log('Sent image: ' + file.name);
+                refreshPreview();
+            } catch (e) {
+                toast(e.message, 'error');
+                log('Send failed: ' + e.message, 'error');
+            }
+        }
+        
+        async function showDemo() {
+            const demoData = {
+                "🌡️ Temp": "24.5°C",
+                "💧 Humidity": "65%",
+                "📡 Signal": "-42 dBm",
+                "⏱️ Uptime": "3d 12h"
+            };
+            
+            document.getElementById('dashData').value = JSON.stringify(demoData, null, 4);
+            document.getElementById('dashTitle').value = "Smart Home";
+            
+            // Switch to dashboard tab
+            document.querySelectorAll('.tab')[1].click();
+            previewDashboard();
+        }
+        
+        function refreshPreview() {
+            showPreview('/api/last-image?_=' + Date.now());
+        }
+        
+        // Initialize
+        checkDeviceStatus();
+        setInterval(checkDeviceStatus, 10000);
+        
+        // Try to load last image
+        refreshPreview();
+    </script>
+</body>
+</html>
+
