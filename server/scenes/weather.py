@@ -148,18 +148,18 @@ class WeatherScene(Scene):
         """Render weather forecast"""
         img = generator.create_blank()
         city = data.get('city', 'Weather')
-        generator.draw_header(img, f"🌤️ {city}")
+        generator.draw_header(img, f"{city}")
         
         draw = ImageDraw.Draw(img)
         forecasts = data.get('forecasts', [])
-        unit = data.get('unit', '°C')
         
-        font_day = generator.get_font(11)
-        font_temp = generator.get_font(14)
-        font_icon = generator.get_font(18)
-        font_small = generator.get_font(9)
+        font_day = generator.get_font(14, "bold")
+        font_temp = generator.get_font(20, "mono")
+        font_weather = generator.get_font(16, "bold")
+        font_precip = generator.get_font(14, "mono")
         
-        y = 28
+        y = 26
+        row_height = 32
         
         for forecast in forecasts:
             day = forecast.get('day', '')
@@ -168,26 +168,23 @@ class WeatherScene(Scene):
             code = forecast.get('code', 0)
             precip = forecast.get('precip', 0)
             
-            icon = self._get_weather_icon(code)
-            
-            # Day name
-            draw.text((8, y), day, font=font_day, fill=0)
-            
-            # Icon (as text since PIL doesn't render emoji, we'll use text)
-            # Using simple text representation
             weather_text = self._get_weather_text(code)
-            draw.text((8, y + 12), weather_text, font=font_small, fill=0)
             
-            # Temperatures
-            temp_str = f"{temp_max:.0f}/{temp_min:.0f}{unit}"
-            draw.text((130, y + 4), temp_str, font=font_temp, fill=0)
+            # Day name (short)
+            draw.text((4, y), day[:3], font=font_day, fill=0)
+            
+            # Weather text
+            draw.text((4, y + 14), weather_text, font=font_weather, fill=0)
+            
+            # Temperatures (right side)
+            temp_str = f"{temp_max:.0f}/{temp_min:.0f}"
+            draw.text((140, y + 4), temp_str, font=font_temp, fill=0)
             
             # Precipitation chance
             if precip > 0:
-                precip_str = f"💧{precip}%"
-                draw.text((200, y + 6), f"{precip}%", font=font_small, fill=0)
+                draw.text((200, y + 6), f"{precip}%", font=font_precip, fill=0)
             
-            y += 32
+            y += row_height
             
             if y > generator.height - 16:
                 break

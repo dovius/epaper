@@ -1,5 +1,5 @@
 """
-Network Scene - Display OctoPrint and TrueNAS status
+Network Scene - Display OctoPrint status
 """
 
 import httpx
@@ -9,19 +9,19 @@ from .base import Scene, SceneConfig
 
 
 class NetworkScene(Scene):
-    """Display network service status (OctoPrint, TrueNAS)"""
+    """Display OctoPrint printer status"""
     
     id = "network"
-    name = "Network Services"
-    description = "Monitor OctoPrint and TrueNAS status"
-    icon = "🖧"
+    name = "OctoPrint"
+    description = "3D Printer status"
+    icon = "🖨️"
     
     settings_schema = [
         {
             'key': 'octoprint_url',
             'label': 'OctoPrint URL',
             'type': 'text',
-            'default': 'http://octopi.local',
+            'default': 'http://192.168.1.188',
             'description': 'OctoPrint server URL'
         },
         {
@@ -29,183 +29,182 @@ class NetworkScene(Scene):
             'label': 'OctoPrint API Key',
             'type': 'password',
             'default': '',
-        },
-        {
-            'key': 'truenas_url',
-            'label': 'TrueNAS URL',
-            'type': 'text',
-            'default': 'http://truenas.local',
-            'description': 'TrueNAS server URL'
-        },
-        {
-            'key': 'truenas_api_key',
-            'label': 'TrueNAS API Key',
-            'type': 'password',
-            'default': '',
+            'description': 'From OctoPrint Settings > API'
         },
     ]
     
     async def fetch_data(self) -> dict:
-        """Fetch status from OctoPrint and TrueNAS"""
-        octoprint_url = self.config.settings.get('octoprint_url', 'http://octopi.local')
-        octoprint_key = self.config.settings.get('octoprint_api_key', '')
-        truenas_url = self.config.settings.get('truenas_url', 'http://truenas.local')
-        truenas_key = self.config.settings.get('truenas_api_key', '')
+        """Fetch OctoPrint status"""
+        url = self.config.settings.get('octoprint_url', 'http://192.168.1.188')
+        api_key = self.config.settings.get('octoprint_api_key', '')
         
-        result = {
-            'octoprint': await self._check_octoprint(octoprint_url, octoprint_key),
-            'truenas': await self._check_truenas(truenas_url, truenas_key),
-        }
-        
-        return result
+        return await self._check_octoprint(url, api_key)
     
     async def _check_octoprint(self, url: str, api_key: str) -> dict:
-        """Check OctoPrint status"""
+        """Get detailed OctoPrint status"""
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 headers = {}
                 if api_key:
                     headers['X-Api-Key'] = api_key
                 
-                # Check connection
-                resp = await client.get(f"{url}/api/connection", headers=headers)
+                # Get printer state and temperatures
+                printer_resp = await client.get(f"{url}/api/printer", headers=headers)
                 
-                if resp.status_code == 200:
-                    conn_data = resp.json()
-                    state = conn_data.get('current', {}).get('state', 'Unknown')
+                if printer_resp.status_code == 200:
+                    printer = printer_resp.json()
                     
-                    # Check printer status
+                    # Temperatures
+                    temps = printer.get('temperature', {})
+                    tool0 = temps.get('tool0', {})
+                    bed = temps.get('bed', {})
+                    
+                    nozzle_actual = tool0.get('actual', 0)
+                    nozzle_target = tool0.get('target', 0)
+                    bed_actual = bed.get('actual', 0)
+                    bed_target = bed.get('target', 0)
+                    
+                    # Printer state
+                    state = printer.get('state', {})
+                    state_text = state.get('text', 'Unknown')
+                    is_printing = state.get('flags', {}).get('printing', False)
+                    
+                    # Get job info
                     job_resp = await client.get(f"{url}/api/job", headers=headers)
                     job_data = {}
                     if job_resp.status_code == 200:
                         job_data = job_resp.json()
                     
-                    job_state = job_data.get('state', 'Idle')
-                    progress = job_data.get('progress', {}).get('completion', 0)
+                    progress = job_data.get('progress', {})
+                    completion = progress.get('completion', 0) or 0
+                    print_time = progress.get('printTime', 0) or 0
+                    print_time_left = progress.get('printTimeLeft', 0) or 0
+                    
+                    job = job_data.get('job', {})
+                    file_name = job.get('file', {}).get('name', '')
                     
                     return {
                         'status': 'online',
-                        'code': resp.status_code,
-                        'state': state,
-                        'job_state': job_state,
-                        'progress': progress or 0,
+                        'state': state_text,
+                        'is_printing': is_printing,
+                        'nozzle_temp': nozzle_actual,
+                        'nozzle_target': nozzle_target,
+                        'bed_temp': bed_actual,
+                        'bed_target': bed_target,
+                        'progress': completion,
+                        'print_time': print_time,
+                        'time_left': print_time_left,
+                        'file_name': file_name,
+                    }
+                
+                elif printer_resp.status_code == 409:
+                    # Printer not connected
+                    return {
+                        'status': 'online',
+                        'state': 'Disconnected',
+                        'is_printing': False,
                     }
                 else:
                     return {
                         'status': 'error',
-                        'code': resp.status_code,
-                        'state': 'HTTP Error',
+                        'state': f'HTTP {printer_resp.status_code}',
                     }
+                    
         except httpx.ConnectError:
-            return {'status': 'offline', 'code': 0, 'state': 'Unreachable'}
+            return {'status': 'offline', 'state': 'Unreachable'}
         except Exception as e:
-            return {'status': 'error', 'code': 0, 'state': str(e)[:20]}
+            return {'status': 'error', 'state': str(e)[:20]}
     
-    async def _check_truenas(self, url: str, api_key: str) -> dict:
-        """Check TrueNAS status"""
-        try:
-            async with httpx.AsyncClient(timeout=5, verify=False) as client:
-                headers = {}
-                if api_key:
-                    headers['Authorization'] = f'Bearer {api_key}'
-                
-                # Check system info
-                resp = await client.get(f"{url}/api/v2.0/system/info", headers=headers)
-                
-                if resp.status_code == 200:
-                    data = resp.json()
-                    
-                    # Get pool status
-                    pool_resp = await client.get(f"{url}/api/v2.0/pool", headers=headers)
-                    pools = []
-                    if pool_resp.status_code == 200:
-                        pool_data = pool_resp.json()
-                        for pool in pool_data[:2]:  # Max 2 pools
-                            pools.append({
-                                'name': pool.get('name', 'Unknown'),
-                                'status': pool.get('status', 'Unknown'),
-                            })
-                    
-                    return {
-                        'status': 'online',
-                        'code': resp.status_code,
-                        'hostname': data.get('hostname', 'TrueNAS'),
-                        'version': data.get('version', 'Unknown'),
-                        'pools': pools,
-                    }
-                else:
-                    return {
-                        'status': 'error',
-                        'code': resp.status_code,
-                        'state': 'HTTP Error',
-                    }
-        except httpx.ConnectError:
-            return {'status': 'offline', 'code': 0, 'state': 'Unreachable'}
-        except Exception as e:
-            return {'status': 'error', 'code': 0, 'state': str(e)[:20]}
+    def _format_time(self, seconds: int) -> str:
+        """Format seconds to HH:MM"""
+        if not seconds:
+            return "--:--"
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        return f"{minutes}m"
     
     def render(self, data: dict, generator) -> Image.Image:
-        """Render network service status"""
+        """Render OctoPrint status"""
         img = generator.create_blank()
-        generator.draw_header(img, "🖧 Network")
+        generator.draw_header(img, "OctoPrint")
         
         draw = ImageDraw.Draw(img)
         
-        font_label = generator.get_font(12)
-        font_value = generator.get_font(10)
-        font_small = generator.get_font(9)
+        font_label = generator.get_font(12, "medium")
+        font_temp = generator.get_font(18, "mono")
+        font_big = generator.get_font(32, "mono")
+        font_time = generator.get_font(14, "mono")
+        font_file = generator.get_font(11, "medium")
         
-        y = 30
+        status = data.get('status', 'unknown')
+        state = data.get('state', 'Unknown')
         
-        # OctoPrint
-        octo = data.get('octoprint', {})
-        draw.text((8, y), "OctoPrint", font=font_label, fill=0)
+        if status != 'online' or state == 'Disconnected':
+            draw.text((6, 50), "Offline", font=font_big, fill=0)
+            return img
         
-        status = octo.get('status', 'unknown')
-        status_icon = "●" if status == 'online' else "○"
-        status_text = f"{status_icon} {status.upper()}"
-        draw.text((100, y), status_text, font=font_value, fill=0)
+        y = 24
         
-        if status == 'online':
-            state = octo.get('state', '')
-            job = octo.get('job_state', '')
-            progress = octo.get('progress', 0)
+        # Temperatures - two columns
+        nozzle = data.get('nozzle_temp', 0)
+        nozzle_t = data.get('nozzle_target', 0)
+        bed = data.get('bed_temp', 0)
+        bed_t = data.get('bed_target', 0)
+        
+        # Nozzle (left side)
+        draw.text((6, y), "Nozzle", font=font_label, fill=0)
+        nozzle_str = f"{nozzle:.0f}"
+        if nozzle_t > 0:
+            nozzle_str += f"/{nozzle_t:.0f}"
+        draw.text((6, y + 12), nozzle_str, font=font_temp, fill=0)
+        
+        # Bed (right side)
+        draw.text((130, y), "Bed", font=font_label, fill=0)
+        bed_str = f"{bed:.0f}"
+        if bed_t > 0:
+            bed_str += f"/{bed_t:.0f}"
+        draw.text((130, y + 12), bed_str, font=font_temp, fill=0)
+        
+        y += 36
+        
+        # If printing - show progress
+        if data.get('is_printing', False):
+            progress = data.get('progress', 0)
+            time_left = data.get('time_left', 0)
             
-            y += 14
-            draw.text((12, y), f"Printer: {state}", font=font_small, fill=0)
+            # Progress percentage - big (left)
+            draw.text((6, y), f"{progress:.0f}%", font=font_big, fill=0)
             
-            if job and job != 'Idle':
-                y += 12
-                draw.text((12, y), f"Job: {job} ({progress:.0f}%)", font=font_small, fill=0)
-        
-        y += 22
-        
-        # Separator
-        draw.line([(8, y), (generator.width - 8, y)], fill=0, width=1)
-        y += 8
-        
-        # TrueNAS
-        truenas = data.get('truenas', {})
-        draw.text((8, y), "TrueNAS", font=font_label, fill=0)
-        
-        status = truenas.get('status', 'unknown')
-        status_icon = "●" if status == 'online' else "○"
-        status_text = f"{status_icon} {status.upper()}"
-        draw.text((100, y), status_text, font=font_value, fill=0)
-        
-        if status == 'online':
-            hostname = truenas.get('hostname', '')
-            pools = truenas.get('pools', [])
+            # Time left (right)
+            time_str = self._format_time(time_left)
+            draw.text((130, y + 4), "Left", font=font_label, fill=0)
+            draw.text((130, y + 16), time_str, font=font_time, fill=0)
             
-            y += 14
-            if hostname:
-                draw.text((12, y), f"Host: {hostname}", font=font_small, fill=0)
+            y += 38
             
-            for pool in pools:
-                y += 12
-                name = pool.get('name', '')
-                pstatus = pool.get('status', '')
-                draw.text((12, y), f"Pool {name}: {pstatus}", font=font_small, fill=0)
+            # Progress bar
+            bar_x = 6
+            bar_y = y
+            bar_w = generator.width - 12
+            bar_h = 8
+            
+            draw.rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], outline=0, width=1)
+            fill_w = int((progress / 100) * (bar_w - 2))
+            if fill_w > 0:
+                draw.rectangle([bar_x + 1, bar_y + 1, bar_x + 1 + fill_w, bar_y + bar_h - 1], fill=0)
+            
+            y += 12
+            
+            # File name
+            file_name = data.get('file_name', '')
+            if file_name:
+                if len(file_name) > 30:
+                    file_name = file_name[:27] + "..."
+                draw.text((6, y), file_name, font=font_file, fill=0)
+        else:
+            # Not printing
+            draw.text((6, y + 5), "Ready", font=font_big, fill=0)
         
         return img
-

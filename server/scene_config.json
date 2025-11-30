@@ -9,13 +9,15 @@
     "network",
     "system"
   ],
-  "current_scene_idx": 5,
+  "current_scene_idx": 0,
   "scenes": {
     "stocks": {
       "enabled": true,
       "interval": 60,
       "priority": 10,
-      "settings": {}
+      "settings": {
+        "finnhub_key": "d4lo2i9r01qr851pk620d4lo2i9r01qr851pk62g"
+      }
     },
     "bitcoin": {
       "enabled": true,
@@ -30,22 +32,31 @@
       "settings": {}
     },
     "notifications": {
-      "enabled": true,
+      "enabled": false,
       "interval": 60,
       "priority": 10,
-      "settings": {}
+      "settings": {
+        "max_notifications": 5
+      }
     },
     "network": {
       "enabled": true,
       "interval": 60,
       "priority": 10,
-      "settings": {}
+      "settings": {
+        "octoprint_url": "http://192.168.1.188",
+        "octoprint_api_key": "5C1F9A5EFB1A442FB8021690A3ED8A87"
+      }
     },
     "system": {
-      "enabled": true,
+      "enabled": false,
       "interval": 60,
       "priority": 10,
-      "settings": {}
+      "settings": {
+        "time_format": "24h",
+        "show_seconds": false,
+        "show_date": true
+      }
     }
   }
 }

@@ -108,39 +108,40 @@ class SystemScene(Scene):
     def render(self, data: dict, generator) -> Image.Image:
         """Render system info"""
         img = generator.create_blank()
-        generator.draw_header(img, "⏱️ System")
+        generator.draw_header(img, "System")
         
         draw = ImageDraw.Draw(img)
         
-        font_large = generator.get_font(28)
-        font_medium = generator.get_font(14)
-        font_label = generator.get_font(10)
-        font_value = generator.get_font(12)
+        font_time = generator.get_font(42, "mono")
+        font_weekday = generator.get_font(20, "bold")
+        font_date = generator.get_font(16, "mono")
+        font_label = generator.get_font(14, "medium")
+        font_value = generator.get_font(16, "mono")
         
         # Large time display
         time_str = data.get('time', '00:00')
-        draw.text((8, 30), time_str, font=font_large, fill=0)
+        draw.text((8, 24), time_str, font=font_time, fill=0)
         
         # Date and weekday
         if self.config.settings.get('show_date', True):
             date_str = data.get('date', '')
             weekday = data.get('weekday_lt', '')
             
-            draw.text((8, 60), weekday, font=font_medium, fill=0)
-            draw.text((8, 76), date_str, font=font_value, fill=0)
+            draw.text((8, 66), weekday, font=font_weekday, fill=0)
+            draw.text((140, 68), date_str, font=font_date, fill=0)
         
         # Uptime section
-        draw.line([(8, 94), (generator.width - 8, 94)], fill=0, width=1)
+        draw.line([(6, 90), (generator.width - 6, 90)], fill=0, width=1)
         
-        draw.text((8, 100), "Uptime:", font=font_label, fill=0)
+        draw.text((6, 96), "Uptime:", font=font_label, fill=0)
         uptime = data.get('uptime', '')
-        draw.text((60, 98), uptime, font=font_value, fill=0)
+        draw.text((70, 94), uptime, font=font_value, fill=0)
         
         # Start time
         start = data.get('start_time', '')
         if start:
-            draw.text((8, 114), "Started:", font=font_label, fill=0)
-            draw.text((60, 112), start, font=font_value, fill=0)
+            draw.text((6, 112), "Start:", font=font_label, fill=0)
+            draw.text((55, 110), start, font=font_value, fill=0)
         
         return img
 

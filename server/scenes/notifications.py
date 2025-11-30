@@ -86,22 +86,22 @@ class NotificationsScene(Scene):
         notifications = data.get('notifications', [])
         total = data.get('total_unread', 0)
         
-        header = f"🔔 Notifications ({total})" if total > 0 else "🔔 Notifications"
+        header = f"Notifications ({total})" if total > 0 else "Notifications"
         generator.draw_header(img, header)
         
         draw = ImageDraw.Draw(img)
         
         if not notifications:
             # No notifications
-            font = generator.get_font(14)
+            font = generator.get_font(18, "medium")
             draw.text((8, 50), "No new notifications", font=font, fill=0)
             return img
         
-        font_title = generator.get_font(11)
-        font_msg = generator.get_font(9)
-        font_time = generator.get_font(8)
+        font_title = generator.get_font(16, "bold")
+        font_msg = generator.get_font(14, "medium")
+        font_time = generator.get_font(12, "mono")
         
-        y = 28
+        y = 26
         
         for notif in notifications:
             title = notif.get('title', 'Notification')
@@ -111,30 +111,30 @@ class NotificationsScene(Scene):
             
             # Priority indicator
             if priority == 'high':
-                draw.rectangle([4, y + 2, 6, y + 12], fill=0)
+                draw.rectangle([4, y + 2, 6, y + 14], fill=0)
             
             # Title
-            draw.text((10, y), title[:25], font=font_title, fill=0)
+            draw.text((10, y), title[:20], font=font_title, fill=0)
             
             # Message (truncated)
             if message:
-                msg_short = message[:35] + '...' if len(message) > 35 else message
-                draw.text((10, y + 12), msg_short, font=font_msg, fill=0)
+                msg_short = message[:28] + '...' if len(message) > 28 else message
+                draw.text((10, y + 16), msg_short, font=font_msg, fill=0)
             
             # Time
             if timestamp:
                 try:
                     dt = datetime.fromisoformat(timestamp)
                     time_str = dt.strftime("%H:%M")
-                    draw.text((210, y + 2), time_str, font=font_time, fill=0)
+                    draw.text((200, y + 2), time_str, font=font_time, fill=0)
                 except:
                     pass
             
-            y += 28
+            y += 36
             
             # Separator line
             if y < generator.height - 20:
-                draw.line([(8, y - 4), (generator.width - 8, y - 4)], fill=0, width=1)
+                draw.line([(8, y - 6), (generator.width - 8, y - 6)], fill=0, width=1)
             
             if y > generator.height - 20:
                 break

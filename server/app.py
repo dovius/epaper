@@ -77,58 +77,83 @@ class ImageGenerator:
         self._load_fonts()
     
     def _load_fonts(self):
-        """Load fonts with fallbacks"""
-        self.fonts = {}
+        """Load IBM Plex fonts with fallbacks"""
+        self.fonts = {'bold': {}, 'medium': {}, 'mono': {}}
         
-        font_paths = [
-            "C:/Windows/Fonts/consola.ttf",
-            "C:/Windows/Fonts/arial.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-            "/System/Library/Fonts/Menlo.ttc",
-        ]
+        # Font paths by style
+        font_paths = {
+            'bold': [
+                "/System/Library/Fonts/Supplemental/IBMPlexSans-Bold.otf",
+                "/usr/share/fonts/opentype/ibm-plex/IBMPlexSans-Bold.otf",
+                "C:/Windows/Fonts/IBMPlexSans-Bold.otf",
+                "/System/Library/Fonts/Helvetica.ttc",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            ],
+            'medium': [
+                "/System/Library/Fonts/Supplemental/IBMPlexSans-Medium.otf",
+                "/usr/share/fonts/opentype/ibm-plex/IBMPlexSans-Medium.otf",
+                "C:/Windows/Fonts/IBMPlexSans-Medium.otf",
+                "/System/Library/Fonts/Helvetica.ttc",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            ],
+            'mono': [
+                "/System/Library/Fonts/Supplemental/IBMPlexMono-Bold.otf",
+                "/usr/share/fonts/opentype/ibm-plex/IBMPlexMono-Bold.otf",
+                "C:/Windows/Fonts/IBMPlexMono-Bold.otf",
+                "/System/Library/Fonts/Menlo.ttc",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+            ],
+        }
         
-        for size in [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32]:
-            font = None
-            for path in font_paths:
-                try:
-                    font = ImageFont.truetype(path, size)
-                    break
-                except:
-                    continue
-            
-            if font is None:
-                font = ImageFont.load_default()
-            
-            self.fonts[size] = font
+        sizes = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 42, 48]
+        
+        for style, paths in font_paths.items():
+            for size in sizes:
+                font = None
+                for path in paths:
+                    try:
+                        font = ImageFont.truetype(path, size)
+                        break
+                    except:
+                        continue
+                
+                if font is None:
+                    font = ImageFont.load_default()
+                
+                self.fonts[style][size] = font
+        
+        logger.info("Loaded IBM Plex fonts: Sans Bold, Sans Medium, Mono Bold")
     
-    def get_font(self, size: int) -> ImageFont.FreeTypeFont:
-        """Get font by size (or nearest available)"""
-        if size in self.fonts:
-            return self.fonts[size]
-        available = sorted(self.fonts.keys())
+    def get_font(self, size: int, style: str = "medium") -> ImageFont.FreeTypeFont:
+        """Get font by size and style (bold, medium, mono)"""
+        style = style if style in self.fonts else "medium"
+        style_fonts = self.fonts[style]
+        
+        if size in style_fonts:
+            return style_fonts[size]
+        available = sorted(style_fonts.keys())
         nearest = min(available, key=lambda x: abs(x - size))
-        return self.fonts[nearest]
+        return style_fonts[nearest]
     
     def create_blank(self, white: bool = True) -> Image.Image:
-        """Create blank image"""
+        """Create blank grayscale image (for better text rendering)"""
         color = 255 if white else 0
-        return Image.new('1', (self.width, self.height), color)
+        return Image.new('L', (self.width, self.height), color)
     
     def draw_text(self, img: Image.Image, text: str, x: int, y: int, 
-                  font_size: int = 16, color: int = 0) -> Image.Image:
+                  font_size: int = 16, color: int = 0, style: str = "medium") -> Image.Image:
         """Draw text on image"""
         draw = ImageDraw.Draw(img)
-        font = self.get_font(font_size)
+        font = self.get_font(font_size, style)
         draw.text((x, y), text, font=font, fill=color)
         return img
     
     def draw_header(self, img: Image.Image, title: str) -> Image.Image:
-        """Draw header bar"""
+        """Draw header bar (thinner with bold font)"""
         draw = ImageDraw.Draw(img)
-        draw.rectangle([0, 0, self.width, 24], fill=0)
-        font = self.get_font(16)
-        draw.text((8, 4), title, font=font, fill=1)
+        draw.rectangle([0, 0, self.width, 22], fill=0)
+        font = self.get_font(14, "bold")
+        draw.text((6, 3), title, font=font, fill=255)
         return img
     
     def draw_line(self, img: Image.Image, y: int) -> Image.Image:
@@ -144,7 +169,7 @@ class ImageGenerator:
         self.draw_header(img, title)
         
         draw = ImageDraw.Draw(img)
-        font = self.get_font(14)
+        font = self.get_font(18, "medium")
         
         # Word wrap
         words = message.split()
@@ -163,21 +188,24 @@ class ImageGenerator:
         if current_line:
             lines.append(current_line)
         
-        y = 32
-        for line in lines[:6]:
+        y = 28
+        for line in lines[:5]:
             draw.text((8, y), line, font=font, fill=0)
-            y += 18
+            y += 20
         
         if timestamp:
-            font_small = self.get_font(10)
-            draw.text((8, self.height - 16), timestamp, font=font_small, fill=0)
+            font_small = self.get_font(14, "mono")
+            draw.text((8, self.height - 18), timestamp, font=font_small, fill=0)
         
         return img
     
     def to_raw_bytes(self, img: Image.Image) -> bytes:
-        """Convert image to raw bytes for e-paper"""
-        if img.mode != '1':
-            img = img.convert('1')
+        """Convert image to raw bytes for e-paper (with threshold for clean edges)"""
+        # Convert grayscale to 1-bit with threshold for cleaner text edges
+        if img.mode == 'L':
+            img = img.point(lambda x: 255 if x > 128 else 0, '1')
+        elif img.mode != '1':
+            img = img.convert('L').point(lambda x: 255 if x > 128 else 0, '1')
         
         img = img.rotate(-90, expand=True)
         

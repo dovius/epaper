@@ -76,8 +76,8 @@ class Scene(ABC):
     def _render_error(self, generator: Any, error: str) -> Image.Image:
         """Render error state"""
         img = generator.create_blank()
-        generator.draw_header(img, f"⚠️ {self.name}")
-        generator.draw_text(img, "Error:", 8, 32, font_size=12)
+        generator.draw_header(img, f"{self.name}")
+        generator.draw_text(img, "Error:", 8, 30, font_size=16, style="bold")
         
         # Word wrap error message
         words = error.split()
@@ -85,7 +85,7 @@ class Scene(ABC):
         current = ""
         for word in words:
             test = f"{current} {word}".strip()
-            if len(test) < 28:
+            if len(test) < 24:
                 current = test
             else:
                 if current:
@@ -94,10 +94,10 @@ class Scene(ABC):
         if current:
             lines.append(current)
         
-        y = 48
+        y = 50
         for line in lines[:4]:
-            generator.draw_text(img, line, 8, y, font_size=10)
-            y += 14
+            generator.draw_text(img, line, 8, y, font_size=14, style="medium")
+            y += 18
         
         return img
     
