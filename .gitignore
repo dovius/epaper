@@ -19,6 +19,14 @@
 
 # Secrets (NEVER commit!)
 src/config/Secrets.h
+server/scene_config.json
+server/data/
+server/.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
 
 # OS files
 .DS_Store
