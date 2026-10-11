@@ -228,19 +228,34 @@ void Canvas::drawText(int16_t x, int16_t y, const char* text, sFONT* font,
     uint16_t charWidth = font->Width;
     uint16_t charHeight = font->Height;
     uint16_t bytesPerRow = (charWidth + 7) / 8;
+    int16_t startX = x;
 
     while (*text) {
+        if (*text == '\n') {
+            x = startX;
+            y += charHeight;
+            text++;
+            continue;
+        }
+        if ((static_cast<uint8_t>(*text) & 0xC0) == 0x80) {
+            text++;  // UTF-8 continuation byte, its lead byte already drew '?'
+            continue;
+        }
         if (x + charWidth > m_width) {
             // Wrap to next line
-            x = 0;
+            x = startX;
             y += charHeight;
         }
         if (y + charHeight > m_height) {
             break;  // Off screen
         }
 
+        // The fonts only cover printable ASCII; anything else (e.g. UTF-8
+        // bytes of "ą") would index past the font table, so draw '?' instead
+        char c = (*text >= ' ' && *text <= '~') ? *text : '?';
+
         // Calculate character offset in font table
-        uint32_t charOffset = (*text - ' ') * charHeight * bytesPerRow;
+        uint32_t charOffset = (c - ' ') * charHeight * bytesPerRow;
         const uint8_t* charData = &font->table[charOffset];
 
         // Draw character

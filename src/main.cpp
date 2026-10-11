@@ -14,6 +14,7 @@
  *****************************************************************************/
 
 #include <Arduino.h>
+#include <ESPmDNS.h>
 #include "config/Config.h"
 #include "config/Secrets.h"
 #include "display/Display.h"
@@ -107,6 +108,31 @@ void showErrorScreen(const char* title, const char* error) {
     display::epd.updateFast();
 }
 
+// ============================================================================
+// Network services
+// ============================================================================
+
+bool startServices() {
+    // mDNS, so the device is reachable as <hostname>.local
+    if (MDNS.begin(secrets::MDNS_HOSTNAME)) {
+        MDNS.addService("http", "tcp", 80);
+        LOGF("[Main] mDNS: http://%s.local/\n", secrets::MDNS_HOSTNAME);
+    } else {
+        LOGLN("[Main] mDNS failed to start");
+    }
+
+    LOGLN("[Main] Starting API server...");
+    if (!api::server.begin()) {
+        LOGLN("[Main] API server failed to start!");
+        showErrorScreen("API Error", "Failed to start HTTP server.");
+        return false;
+    }
+
+    showReadyScreen();
+    LOGF("[Main] Ready! Access at: http://%s/\n", network::wifi.getIPAddress().c_str());
+    return true;
+}
+
 }  // namespace app
 
 // ============================================================================
@@ -146,14 +172,7 @@ void setup() {
 
     // Start API server
     if (network::wifi.isConnected()) {
-        LOGLN("[Main] Starting API server...");
-        if (!api::server.begin()) {
-            LOGLN("[Main] API server failed to start!");
-            app::showErrorScreen("API Error", "Failed to start HTTP server.");
-        } else {
-            app::showReadyScreen();
-            LOGF("[Main] Ready! Access at: http://%s/\n", network::wifi.getIPAddress().c_str());
-        }
+        app::startServices();
     }
     
     LOGLN("[Main] Setup complete!");
@@ -163,14 +182,15 @@ void loop() {
     // Maintain WiFi connection
     network::wifi.loop();
     
-    // Restart API server if WiFi reconnects
-    static bool wasConnected = false;
+    // If WiFi was down during setup, start the services once it connects.
+    // A running server survives reconnects by itself, so the screen isn't
+    // redrawn then (that would replace the image the server last sent).
+    static bool wasConnected = network::wifi.isConnected();
     bool isConnected = network::wifi.isConnected();
     
-    if (isConnected && !wasConnected) {
-        LOGLN("[Main] WiFi reconnected, restarting API server...");
-        api::server.begin();
-        app::showReadyScreen();
+    if (isConnected && !wasConnected && !api::server.isRunning()) {
+        LOGLN("[Main] WiFi connected, starting services...");
+        app::startServices();
     }
     wasConnected = isConnected;
     

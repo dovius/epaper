@@ -50,7 +50,6 @@ private:
     uint16_t m_port;
     bool m_running;
     uint32_t m_requestCount;
-    uint32_t m_startTime;
 
     // Setup route handlers
     void setupRoutes();
@@ -68,6 +67,7 @@ private:
     void sendJsonResponse(AsyncWebServerRequest* request, int code, const char* status, const char* message = nullptr);
     void sendJsonError(AsyncWebServerRequest* request, int code, const char* error);
     String getUptimeString();
+    static const char* getResetReason();
 };
 
 // Global server instance

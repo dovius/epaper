@@ -2,6 +2,9 @@
  * ApiServer.cpp - HTTP API Server implementation
  *****************************************************************************/
 #include "ApiServer.h"
+#include <AsyncJson.h>
+#include <esp_system.h>
+#include <esp_timer.h>
 #include "../network/WiFiManager.h"
 
 namespace api {
@@ -19,7 +22,6 @@ ApiServer::ApiServer(uint16_t port)
     , m_port(port)
     , m_running(false)
     , m_requestCount(0)
-    , m_startTime(0)
 {
 }
 
@@ -56,7 +58,6 @@ bool ApiServer::begin() {
     setupRoutes();
     m_server->begin();
     m_running = true;
-    m_startTime = millis();
 
     LOGF("[API] Server started on port %d\n", m_port);
     LOGF("[API] Endpoints:\n");
@@ -113,8 +114,9 @@ void ApiServer::setupRoutes() {
                 LOGLN("[API] Raw image displayed");
             } else {
                 char msg[64];
-                snprintf(msg, sizeof(msg), "Invalid size: received %d, expected %d", 
-                         s_imageBufferSize, config::FRAME_BUFFER_SIZE);
+                snprintf(msg, sizeof(msg), "Invalid size: received %u, expected %u",
+                         static_cast<unsigned>(request->contentLength()),
+                         static_cast<unsigned>(config::FRAME_BUFFER_SIZE));
                 sendJsonError(request, 400, msg);
                 LOGF("[API] Raw image error: %s\n", msg);
             }
@@ -129,29 +131,15 @@ void ApiServer::setupRoutes() {
         }
     );
 
-    // Text display (JSON body)
-    m_server->on("/api/display/text", HTTP_POST,
-        // Request handler (after body received)
-        [](AsyncWebServerRequest* request) {},
-        // Upload handler (not used)
-        nullptr,
-        // Body handler
-        [this](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
-            if (index == 0) {
-                // First chunk - parse JSON
-                JsonDocument doc;
-                DeserializationError error = deserializeJson(doc, data, len);
-                
-                if (error) {
-                    sendJsonError(request, 400, "Invalid JSON");
-                    return;
-                }
-                
-                JsonVariant json = doc.as<JsonVariant>();
-                handleDisplayText(request, json);
-            }
+    // Text display (JSON body). The JSON handler buffers bodies split across
+    // several TCP packets and answers 400 itself for an empty or invalid body.
+    auto* textHandler = new AsyncCallbackJsonWebHandler("/api/display/text",
+        [this](AsyncWebServerRequest* request, JsonVariant& json) {
+            handleDisplayText(request, json);
         }
     );
+    textHandler->setMethod(HTTP_POST);
+    m_server->addHandler(textHandler);
 
     // 404 handler
     m_server->onNotFound([this](AsyncWebServerRequest* request) {
@@ -328,8 +316,17 @@ void ApiServer::handleStatus(AsyncWebServerRequest* request) {
     doc["ip"] = network::wifi.getIPAddress();
     doc["rssi"] = network::wifi.getRSSI();
     doc["uptime"] = getUptimeString();
+    doc["uptimeSeconds"] = static_cast<uint32_t>(esp_timer_get_time() / 1000000);
     doc["requests"] = m_requestCount;
     doc["freeHeap"] = ESP.getFreeHeap();
+    doc["minFreeHeap"] = ESP.getMinFreeHeap();
+    doc["heapSize"] = ESP.getHeapSize();
+    doc["hostname"] = network::wifi.getHostname();
+    doc["mac"] = network::wifi.getMACAddress();
+    doc["ssid"] = WiFi.SSID();
+    doc["chip"] = ESP.getChipModel();
+    doc["sdk"] = ESP.getSdkVersion();
+    doc["resetReason"] = getResetReason();
     doc["display"]["width"] = display::epd.width();
     doc["display"]["height"] = display::epd.height();
     doc["display"]["bufferSize"] = config::FRAME_BUFFER_SIZE;
@@ -344,7 +341,12 @@ void ApiServer::handleDisplayRaw(AsyncWebServerRequest* request, uint8_t* data, 
     if (index == 0) {
         s_imageBufferSize = 0;
         s_imageComplete = false;
-        LOGF("[API] Receiving raw image: %d bytes\n", total);
+        LOGF("[API] Receiving raw image: %u bytes\n", static_cast<unsigned>(total));
+    }
+
+    // Wrong size: ignore the body, the request handler answers 400
+    if (total != config::FRAME_BUFFER_SIZE) {
+        return;
     }
 
     // Copy data to buffer
@@ -356,7 +358,7 @@ void ApiServer::handleDisplayRaw(AsyncWebServerRequest* request, uint8_t* data, 
     // Last chunk
     if (index + len == total) {
         s_imageComplete = true;
-        LOGF("[API] Raw image received: %d bytes\n", s_imageBufferSize);
+        LOGF("[API] Raw image received: %u bytes\n", static_cast<unsigned>(s_imageBufferSize));
     }
 }
 
@@ -469,8 +471,26 @@ void ApiServer::sendJsonError(AsyncWebServerRequest* request, int code, const ch
     request->send(code, "application/json", response);
 }
 
+const char* ApiServer::getResetReason() {
+    // Why the ESP32 last restarted: helps spot crashes and brownouts
+    switch (esp_reset_reason()) {
+        case ESP_RST_POWERON:   return "power-on";
+        case ESP_RST_EXT:       return "external";
+        case ESP_RST_SW:        return "software";
+        case ESP_RST_PANIC:     return "panic";
+        case ESP_RST_INT_WDT:   return "interrupt watchdog";
+        case ESP_RST_TASK_WDT:  return "task watchdog";
+        case ESP_RST_WDT:       return "watchdog";
+        case ESP_RST_DEEPSLEEP: return "deep sleep";
+        case ESP_RST_BROWNOUT:  return "brownout";
+        case ESP_RST_SDIO:      return "SDIO";
+        default:                return "unknown";
+    }
+}
+
 String ApiServer::getUptimeString() {
-    uint32_t seconds = (millis() - m_startTime) / 1000;
+    // Time since boot from the 64-bit timer: millis() wraps after ~49 days
+    uint32_t seconds = static_cast<uint32_t>(esp_timer_get_time() / 1000000);
     uint32_t minutes = seconds / 60;
     uint32_t hours = minutes / 60;
     uint32_t days = hours / 24;

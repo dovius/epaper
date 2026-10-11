@@ -293,6 +293,10 @@ void EPaperDriver::display(const uint8_t* buffer, RefreshMode mode) {
             triggerUpdate(0xF7);
             break;
     }
+
+    // Waveshare: don't leave the panel powered between refreshes. Every
+    // refresh starts with a hardware reset, which wakes it up again.
+    sleep();
 }
 
 void EPaperDriver::displayBase(const uint8_t* buffer) {
@@ -302,12 +306,14 @@ void EPaperDriver::displayBase(const uint8_t* buffer) {
     writeImageToRAM(0x24, buffer);
     writeImageToRAM(0x26, buffer);
     triggerUpdate(0xF7);
+    sleep();
 }
 
 void EPaperDriver::clear(bool white) {
     initFull();
     fillRAM(0x24, white ? 0xFF : 0x00);
     triggerUpdate(0xF7);
+    sleep();
     LOGLN(white ? "[EPD] Cleared to white" : "[EPD] Cleared to black");
 }
 
