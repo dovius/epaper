@@ -2,1242 +2,2313 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Paper Scene Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+    <title>E-Paper</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='6' width='28' height='20' rx='5' fill='%231d1d1f'/%3E%3Crect x='5' y='9' width='22' height='14' rx='2' fill='%23ecebe4'/%3E%3Cpath d='M8 13h9M8 17h13' stroke='%231d1d1f' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+{% raw %}
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-        
+        /* ================================================================
+           Design tokens (Apple system colors, light + dark)
+           ================================================================ */
         :root {
-            --bg: #0a0a0f;
-            --bg-card: #12121a;
-            --bg-hover: #1a1a25;
-            --bg-input: #08080c;
-            --accent: #22d3ee;
-            --accent-dim: #0891b2;
-            --accent-glow: rgba(34, 211, 238, 0.15);
-            --success: #4ade80;
-            --error: #f87171;
-            --warning: #fbbf24;
-            --text: #f1f5f9;
-            --text-dim: #64748b;
-            --text-muted: #475569;
-            --border: #1e293b;
-            --border-bright: #334155;
+            color-scheme: light dark;
+            --bg: #f5f5f7;
+            --card: #ffffff;
+            --tile: #f5f5f7;
+            --sheet-bg: #f2f2f7;
+            --sheet-group: #ffffff;
+            --field: rgba(118, 118, 128, .12);
+            --field-hover: rgba(118, 118, 128, .18);
+            --hover: rgba(0, 0, 0, .035);
+            --label: #1d1d1f;
+            --label-2: #6e6e73;
+            --label-3: #86868b;
+            --separator: rgba(60, 60, 67, .13);
+            --accent: #0071e3;
+            --accent-hover: #0077ed;
+            --accent-tint: rgba(0, 113, 227, .1);
+            --on-accent: #ffffff;
+            --green: #248a3d;
+            --green-fill: #34c759;
+            --green-tint: rgba(52, 199, 89, .14);
+            --orange: #c93400;
+            --orange-fill: #ff9500;
+            --orange-tint: rgba(255, 149, 0, .13);
+            --red: #d70015;
+            --red-fill: #ff3b30;
+            --red-tint: rgba(255, 59, 48, .1);
+            --switch-off: rgba(120, 120, 128, .2);
+            --material: rgba(245, 245, 247, .72);
+            --material-raised: rgba(255, 255, 255, .8);
+            --shadow-card: 0 1px 2px rgba(0, 0, 0, .04), 0 4px 24px rgba(0, 0, 0, .04);
+            --shadow-pop: 0 24px 64px rgba(0, 0, 0, .18), 0 4px 16px rgba(0, 0, 0, .08);
+            --segment-on: #ffffff;
+            --segment-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 3px 1px rgba(0, 0, 0, .04);
+            --paper: #ecebe4;
+            --bezel-a: #2c2c2e;
+            --bezel-b: #18181a;
+            --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
+            --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
+            --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+            --ease: cubic-bezier(.32, .72, 0, 1);
+            --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
         }
-        
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #000000;
+                --card: #1c1c1e;
+                --tile: #2c2c2e;
+                --sheet-bg: #1c1c1e;
+                --sheet-group: #2c2c2e;
+                --field: rgba(118, 118, 128, .24);
+                --field-hover: rgba(118, 118, 128, .32);
+                --hover: rgba(255, 255, 255, .045);
+                --label: #f5f5f7;
+                --label-2: #a1a1a6;
+                --label-3: #8e8e93;
+                --separator: rgba(84, 84, 88, .6);
+                --accent: #0a84ff;
+                --accent-hover: #2b95ff;
+                --accent-tint: rgba(10, 132, 255, .2);
+                --green: #30d158;
+                --green-fill: #30d158;
+                --green-tint: rgba(48, 209, 88, .16);
+                --orange: #ff9f0a;
+                --orange-fill: #ff9f0a;
+                --orange-tint: rgba(255, 159, 10, .16);
+                --red: #ff453a;
+                --red-fill: #ff453a;
+                --red-tint: rgba(255, 69, 58, .16);
+                --switch-off: rgba(120, 120, 128, .36);
+                --material: rgba(22, 22, 23, .72);
+                --material-raised: rgba(44, 44, 46, .82);
+                --shadow-card: 0 0 0 1px rgba(255, 255, 255, .05);
+                --shadow-pop: 0 24px 64px rgba(0, 0, 0, .6), 0 0 0 1px rgba(255, 255, 255, .08);
+                --segment-on: #636366;
+                --segment-shadow: 0 3px 8px rgba(0, 0, 0, .3);
+                --paper: #dcdad2;
+                --bezel-a: #3a3a3c;
+                --bezel-b: #232325;
+            }
+        }
+
+        /* ================================================================
+           Base
+           ================================================================ */
+        *, *::before, *::after { box-sizing: border-box; }
+        [hidden] { display: none !important; }
+        html { -webkit-text-size-adjust: 100%; }
         body {
-            font-family: 'Space Grotesk', system-ui, sans-serif;
+            margin: 0;
             background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            background-image: 
-                radial-gradient(ellipse at 0% 0%, rgba(34, 211, 238, 0.05) 0%, transparent 50%),
-                radial-gradient(ellipse at 100% 100%, rgba(139, 92, 246, 0.03) 0%, transparent 50%);
+            color: var(--label);
+            font: 15px/1.47 var(--font);
+            letter-spacing: -.009em;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
-        
-        /* Header */
-        .header {
-            background: linear-gradient(180deg, var(--bg-card), transparent);
-            border-bottom: 1px solid var(--border);
-            padding: 1rem 1.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            backdrop-filter: blur(12px);
+        button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }
+        button { cursor: pointer; }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        :focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 2px; }
+        code { font: 13px var(--mono); }
+        .mono { font-family: var(--mono); }
+
+        .icon { display: inline-flex; width: 1.15em; height: 1.15em; flex: none; }
+        .icon svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+        .spinner {
+            width: 16px; height: 16px; flex: none;
+            border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+            animation: spin .8s linear infinite;
         }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ================================================================
+           Navigation bar (translucent material)
+           ================================================================ */
+        .nav {
+            position: sticky; top: 0; z-index: 20;
+            background: var(--material);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid var(--separator);
         }
-        
-        .logo-icon {
-            font-size: 1.5rem;
-            filter: drop-shadow(0 0 8px var(--accent));
+        .nav-inner { max-width: 1240px; height: 52px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; gap: 12px; }
+        .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; letter-spacing: -.022em; white-space: nowrap; }
+        .brand small { font-weight: 400; font-size: 15px; color: var(--label-2); margin-left: 2px; }
+        .brand-mark {
+            width: 28px; height: 28px; border-radius: 7px; flex: none;
+            display: grid; place-items: center;
+            background: linear-gradient(160deg, #3a3a3c, #1c1c1e);
+            box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .18);
         }
-        
-        .logo h1 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--accent);
-            letter-spacing: -0.5px;
+        .brand-mark span { width: 18px; height: 11px; border-radius: 2px; background: #ecebe4; box-shadow: inset 0 -3px 0 -1.5px #1d1d1f; }
+        .nav-spacer { flex: 1; }
+        .status-pill {
+            display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px;
+            border: 0; border-radius: 999px; background: var(--field);
+            font-size: 13px; font-weight: 500; white-space: nowrap;
         }
-        
-        .header-actions {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-        
-        .status-badge {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            border-radius: 6px;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            font-size: 0.85rem;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        
-        .status-dot.online { background: var(--success); box-shadow: 0 0 8px var(--success); }
-        .status-dot.offline { background: var(--error); }
-        
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        
-        /* Layout */
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 1.5rem;
-        }
-        
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 320px;
-            gap: 1.5rem;
-        }
-        
-        @media (max-width: 1024px) {
-            .grid { grid-template-columns: 1fr; }
-        }
-        
-        /* Cards */
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid var(--border);
-            background: linear-gradient(180deg, var(--bg-hover), transparent);
-        }
-        
-        .card-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
-            font-size: 0.95rem;
-        }
-        
-        .card-body { padding: 1rem 1.25rem; }
-        
-        /* Scene List */
-        .scene-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        
-        .scene-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .scene-item:hover {
-            border-color: var(--border-bright);
-            background: var(--bg-hover);
-        }
-        
-        .scene-item.active {
-            border-color: var(--accent);
-            background: var(--accent-glow);
-        }
-        
-        .scene-item.disabled {
-            opacity: 0.5;
-        }
-        
-        .scene-icon {
-            font-size: 1.5rem;
-            width: 40px;
-            text-align: center;
-        }
-        
-        .scene-info { flex: 1; }
-        
-        .scene-name {
-            font-weight: 500;
-            margin-bottom: 2px;
-        }
-        
-        .scene-desc {
-            font-size: 0.8rem;
-            color: var(--text-dim);
-        }
-        
-        .scene-actions {
-            display: flex;
-            gap: 6px;
-        }
-        
-        .scene-badge {
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 500;
-            text-transform: uppercase;
-        }
-        
-        .scene-badge.current {
-            background: var(--accent);
-            color: var(--bg);
-        }
-        
-        .scene-badge.error {
-            background: var(--error);
-            color: #fff;
-        }
-        
-        /* Preview */
-        .preview-container {
-            background: var(--bg-input);
-            border: 2px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 280px;
-        }
-        
-        .preview-image {
-            max-width: 100%;
-            border-radius: 4px;
-            image-rendering: pixelated;
-            background: #fff;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-        
-        .preview-placeholder {
-            text-align: center;
-            color: var(--text-dim);
-        }
-        
-        /* Controls */
-        .controls {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-            margin-top: 1rem;
-        }
-        
+        .status-pill:hover { background: var(--field-hover); }
+        .status-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--label-3); flex: none; }
+        .status-pill[data-state="online"] .dot { background: var(--green-fill); box-shadow: 0 0 0 3px var(--green-tint); }
+        .status-pill[data-state="offline"] .dot { background: var(--red-fill); box-shadow: 0 0 0 3px var(--red-tint); }
+        .status-pill .meta { color: var(--label-2); font: 12px var(--mono); }
+
+        /* ================================================================
+           Layout
+           ================================================================ */
+        .page { max-width: 1240px; margin: 0 auto; padding: 28px 24px 48px; }
+        .grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+        .col { display: grid; gap: 24px; min-width: 0; }
+
+        .card { background: var(--card); border-radius: 20px; box-shadow: var(--shadow-card); padding: 22px 24px 24px; min-width: 0; }
+        .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+        .card-title { margin: 0; font: 600 19px/1.25 var(--font-display); letter-spacing: -.02em; }
+        .card-sub { margin: 3px 0 0; color: var(--label-2); font-size: 13px; }
+        .divider { height: 1px; border: 0; margin: 18px 0; background: var(--separator); }
+        .row { display: flex; align-items: center; gap: 10px; }
+        .grow { flex: 1; min-width: 0; }
+
+        /* ================================================================
+           Controls: buttons, switch, segmented control, fields
+           ================================================================ */
         .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            padding: 10px 16px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            background: var(--bg-card);
-            color: var(--text);
-            font-family: inherit;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            height: 36px; padding: 0 16px; border: 0; border-radius: 999px;
+            background: var(--field); color: var(--label);
+            font-size: 14px; font-weight: 500; white-space: nowrap; text-decoration: none;
+            transition: background .15s, transform .1s, opacity .15s;
         }
-        
-        .btn:hover:not(:disabled) {
-            border-color: var(--border-bright);
-            background: var(--bg-hover);
+        .btn:hover { background: var(--field-hover); text-decoration: none; }
+        .btn:active { transform: scale(.97); }
+        .btn:disabled { opacity: .4; pointer-events: none; }
+        .btn .icon { width: 17px; height: 17px; }
+        .btn-primary { background: var(--accent); color: var(--on-accent); }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-tinted { background: var(--accent-tint); color: var(--accent); }
+        .btn-tinted:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+        .btn-plain { background: transparent; color: var(--accent); padding: 0 10px; }
+        .btn-plain:hover { background: var(--accent-tint); }
+        .btn-danger { color: var(--red); }
+        .btn-danger:hover { background: var(--red-tint); }
+        .btn-strong { font-weight: 600; }
+        .btn-lg { height: 44px; padding: 0 22px; font-size: 15px; }
+        .btn-lg .icon { width: 19px; height: 19px; }
+        .btn-sm { height: 30px; padding: 0 12px; font-size: 13px; }
+        .btn-sm .icon { width: 15px; height: 15px; }
+        .btn-icon { width: 36px; padding: 0; }
+        .btn-icon.btn-lg { width: 44px; }
+        .btn-icon.btn-sm { width: 30px; }
+        .btn-block { display: flex; width: 100%; }
+        .btn.is-loading { pointer-events: none; }
+        .btn.is-loading > * { opacity: .5; }
+        .btn.is-loading::after {
+            content: ""; width: 14px; height: 14px; flex: none;
+            border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+            animation: spin .8s linear infinite;
         }
-        
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        
-        .btn-primary {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: var(--bg);
+
+        .switch {
+            position: relative; flex: none; width: 46px; height: 28px; padding: 0;
+            border: 0; border-radius: 999px; background: var(--switch-off);
+            transition: background .25s var(--ease);
         }
-        
-        .btn-primary:hover:not(:disabled) {
-            background: var(--accent-dim);
-            box-shadow: 0 0 20px var(--accent-glow);
+        .switch::after {
+            content: ""; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%;
+            background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, .15), 0 1px 1px rgba(0, 0, 0, .16);
+            transition: transform .25s var(--ease);
         }
-        
-        .btn-sm { padding: 6px 10px; font-size: 0.8rem; }
-        
-        .btn-icon {
-            width: 36px;
-            height: 36px;
-            padding: 0;
-            font-size: 1.1rem;
+        .switch[aria-checked="true"] { background: var(--green-fill); }
+        .switch[aria-checked="true"]::after { transform: translateX(18px); }
+        .switch:disabled { opacity: .5; }
+
+        .segmented {
+            display: inline-flex; max-width: 100%; padding: 2px; border-radius: 9px;
+            background: var(--field); overflow-x: auto; scrollbar-width: none;
         }
-        
-        /* Rotation Controls */
-        .rotation-controls {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 1rem;
-            background: var(--bg-input);
-            border-radius: 8px;
-            margin-bottom: 1rem;
+        .segmented::-webkit-scrollbar { display: none; }
+        .segmented button {
+            flex: 1 0 auto; height: 28px; padding: 0 12px; border: 0; border-radius: 7px;
+            background: transparent; font-size: 13px; font-weight: 500; white-space: nowrap;
+            transition: background .2s, box-shadow .2s;
         }
-        
-        .rotation-toggle {
-            position: relative;
-            width: 48px;
-            height: 26px;
-            background: var(--border);
-            border-radius: 13px;
-            cursor: pointer;
-            transition: background 0.3s;
+        .segmented button[aria-checked="true"] { background: var(--segment-on); box-shadow: var(--segment-shadow); font-weight: 600; }
+        .segmented.full { display: flex; width: 100%; }
+
+        .field { display: grid; gap: 6px; }
+        .field + .field, .field + .field-pair, .field-pair + .field { margin-top: 12px; }
+        .field-label { font-size: 13px; font-weight: 500; color: var(--label-2); }
+        .field-pair { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
+        .field-pair > .field + .field { margin-top: 0; }
+        .input {
+            width: 100%; min-height: 40px; padding: 9px 12px; border: 0; border-radius: 10px;
+            background: var(--field); outline: none;
+            transition: box-shadow .15s, background .15s;
         }
-        
-        .rotation-toggle.active {
-            background: var(--accent);
+        .input::placeholder { color: var(--label-3); }
+        .input:hover { background: var(--field-hover); }
+        .input:focus { background: var(--field); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent); }
+        .input.mono { font: 13px var(--mono); }
+        textarea.input { min-height: 84px; resize: vertical; line-height: 1.45; }
+        .input-wrap { position: relative; }
+        .input-wrap .input { padding-right: 44px; }
+        .input-wrap .input-addon { position: absolute; top: 5px; right: 5px; background: transparent; color: var(--label-2); }
+        .help { margin: 0; font-size: 12px; line-height: 1.4; color: var(--label-2); }
+        .form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 16px; }
+        .form-actions .help { margin-right: auto; }
+
+        .badge {
+            display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px;
+            border-radius: 999px; font-size: 11.5px; font-weight: 600; letter-spacing: 0; white-space: nowrap;
         }
-        
-        .rotation-toggle::after {
-            content: '';
-            position: absolute;
-            top: 3px;
-            left: 3px;
-            width: 20px;
-            height: 20px;
-            background: #fff;
-            border-radius: 50%;
-            transition: transform 0.3s;
+        .badge .icon { width: 12px; height: 12px; }
+        .badge .icon svg { stroke-width: 2.4; }
+        .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .badge-accent { background: var(--accent-tint); color: var(--accent); }
+        .badge-gray { background: var(--field); color: var(--label-2); }
+        .badge-green { background: var(--green-tint); color: var(--green); }
+        .badge-red { background: var(--red-tint); color: var(--red); }
+        .text-red, .text-green, .text-orange { display: inline-flex; align-items: center; gap: 4px; }
+        .text-red { color: var(--red); }
+        .text-green { color: var(--green); }
+        .text-orange { color: var(--orange); }
+
+        .callout { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.4; margin-bottom: 16px; }
+        .callout > .icon { width: 18px; height: 18px; margin-top: 1px; }
+        .callout-orange { background: var(--orange-tint); }
+        .callout-orange > .icon { color: var(--orange); }
+        .callout-red { background: var(--red-tint); }
+        .callout-red > .icon { color: var(--red); }
+        .callout .mono { display: block; margin-top: 4px; font-size: 12px; color: var(--label-2); overflow-wrap: anywhere; }
+        .callout .btn { margin-top: -4px; }
+
+        .empty { padding: 16px 8px 4px; text-align: center; font-size: 13px; color: var(--label-2); }
+        .empty .mono { margin-top: 2px; font-size: 12px; color: var(--label-3); }
+
+        /* Scene icons, iOS Settings style */
+        .scene-icon {
+            width: 36px; height: 36px; border-radius: 9px; flex: none;
+            display: grid; place-items: center; color: #fff; font-size: 18px;
+            box-shadow: inset 0 0 0 .5px rgba(0, 0, 0, .08);
         }
-        
-        .rotation-toggle.active::after {
-            transform: translateX(22px);
+        .scene-icon .icon { width: 21px; height: 21px; }
+        .scene-icon .icon svg { stroke-width: 2; }
+        .scene-icon.sm { width: 24px; height: 24px; border-radius: 6px; font-size: 13px; }
+        .scene-icon.sm .icon { width: 15px; height: 15px; }
+        .scene-icon.lg { width: 44px; height: 44px; border-radius: 11px; font-size: 22px; }
+        .scene-icon.lg .icon { width: 26px; height: 26px; }
+        .tint-green { background: linear-gradient(180deg, #4cd964, #2db84c); }
+        .tint-orange { background: linear-gradient(180deg, #ffb340, #ff8f00); }
+        .tint-blue { background: linear-gradient(180deg, #47a6ff, #0a6ff0); }
+        .tint-red { background: linear-gradient(180deg, #ff6a60, #f0352c); }
+        .tint-indigo { background: linear-gradient(180deg, #7f7cf2, #5752d8); }
+        .tint-gray { background: linear-gradient(180deg, #a5a5aa, #7d7d83); }
+        .tint-teal { background: linear-gradient(180deg, #5ac8fa, #20a4dc); }
+        .tint-purple { background: linear-gradient(180deg, #c77dff, #a24ee0); }
+
+        /* ================================================================
+           E-paper screen (used by the hero, thumbnails and previews)
+           ================================================================ */
+        .screen {
+            position: relative; aspect-ratio: 250 / 122; overflow: hidden; isolation: isolate;
+            border-radius: 6px; background: var(--noise), var(--paper);
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .3), inset 0 2px 10px rgba(0, 0, 0, .18);
         }
-        
-        .rotation-info {
-            flex: 1;
+        .screen img {
+            position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+            image-rendering: pixelated; mix-blend-mode: multiply; opacity: .9;
         }
-        
-        .rotation-label {
-            font-weight: 500;
-            font-size: 0.9rem;
+        .screen-empty {
+            position: absolute; inset: 0; display: grid; place-content: center; gap: 2px; padding: 16px;
+            text-align: center; font-size: 14px; color: rgba(0, 0, 0, .5);
         }
-        
-        .rotation-status {
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            font-family: 'JetBrains Mono', monospace;
+        .screen-empty strong { color: rgba(0, 0, 0, .78); font-weight: 600; }
+        .screen-busy {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10px;
+            background: color-mix(in srgb, var(--paper) 72%, transparent);
+            -webkit-backdrop-filter: blur(1.5px); backdrop-filter: blur(1.5px);
+            color: #1d1d1f; font-size: 14px; font-weight: 500;
+            opacity: 0; pointer-events: none; transition: opacity .2s;
         }
-        
-        .interval-input {
-            width: 70px;
-            padding: 6px 10px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            color: var(--text);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            text-align: center;
+        .screen.is-busy .screen-busy { opacity: 1; }
+        /* A short black/white flash, like the panel's own full refresh */
+        .screen.flash img { animation: epd-flash .7s steps(1, end); }
+        @keyframes epd-flash { 0% { filter: invert(1); } 25% { filter: none; } 50% { filter: invert(1); } 75%, 100% { filter: none; } }
+
+        /* ================================================================
+           Now showing (hero)
+           ================================================================ */
+        .hero { padding: 26px 28px 24px; }
+        .eyebrow { font-size: 13px; font-weight: 600; color: var(--accent); }
+        .now-title { display: flex; align-items: center; gap: 12px; margin: 8px 0 2px; }
+        .now-title h1 { margin: 0; font: 700 30px/1.15 var(--font-display); letter-spacing: -.025em; overflow-wrap: anywhere; }
+        .now-meta { font-size: 14px; color: var(--label-2); font-variant-numeric: tabular-nums; }
+
+        .device {
+            position: relative; max-width: 580px; margin: 22px auto 0; padding: 14px 14px 30px; border-radius: 26px;
+            background: linear-gradient(165deg, var(--bezel-a), var(--bezel-b));
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), inset 0 0 0 1px rgba(255, 255, 255, .04),
+                        0 30px 60px -30px rgba(0, 0, 0, .55), 0 8px 20px -10px rgba(0, 0, 0, .35);
         }
-        
-        .interval-input:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-        
-        /* Settings Panel */
-        .settings-panel {
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            margin-top: 1rem;
-            overflow: hidden;
-        }
-        
-        .settings-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border);
-            cursor: pointer;
-        }
-        
-        .settings-header:hover {
-            background: var(--bg-hover);
-        }
-        
-        .settings-content {
-            padding: 16px;
-            display: none;
-        }
-        
-        .settings-content.open {
-            display: block;
-        }
-        
-        .form-group {
-            margin-bottom: 16px;
-        }
-        
-        .form-group:last-child {
-            margin-bottom: 0;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 6px;
-            font-size: 0.85rem;
-            color: var(--text-dim);
-        }
-        
-        input[type="text"],
-        input[type="password"],
-        input[type="number"],
-        select {
-            width: 100%;
-            padding: 10px 12px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text);
-            font-size: 0.9rem;
-            font-family: inherit;
-        }
-        
-        input:focus, select:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-        
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .checkbox-group input {
-            width: 18px;
-            height: 18px;
-            accent-color: var(--accent);
-        }
-        
-        /* Device Info */
-        .device-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-        }
-        
-        .device-item {
-            background: var(--bg-input);
-            padding: 10px 12px;
-            border-radius: 6px;
-        }
-        
         .device-label {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            position: absolute; left: 0; right: 0; bottom: 10px;
+            display: flex; align-items: center; justify-content: center; gap: 7px;
+            font: 500 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: rgba(255, 255, 255, .4);
         }
-        
-        .device-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.9rem;
-            color: var(--accent);
+        .device-led { width: 5px; height: 5px; border-radius: 50%; background: rgba(255, 255, 255, .22); }
+        .device-led[data-state="online"] { background: #30d158; box-shadow: 0 0 6px #30d158; }
+        .device-led[data-state="offline"] { background: #ff453a; box-shadow: 0 0 6px #ff453a; }
+        .specs { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin-top: 12px; font: 12px/1.4 var(--mono); color: var(--label-3); }
+
+        .controls { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 18px; }
+
+        .settings-list { margin-top: 22px; }
+        .list-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; padding: 12px 0; border-top: 1px solid var(--separator); }
+        .row-title { font-size: 15px; font-weight: 500; }
+        .row-sub { margin-top: 1px; font-size: 13px; color: var(--label-2); }
+        .interval { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+        .interval-custom { width: 104px; min-height: 32px; padding: 5px 10px; text-align: right; }
+        .up-next-value { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 500; }
+        #upNext { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+        #upNext > span:not(.scene-icon) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .countdown { min-width: 72px; text-align: right; color: var(--label-2); font: 13px var(--mono); font-variant-numeric: tabular-nums; }
+        .list-row.is-off .up-next-value { color: var(--label-2); }
+        .progress { height: 4px; margin-bottom: 2px; border-radius: 999px; background: var(--accent-tint); overflow: hidden; }
+        .progress span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform .25s linear; }
+        .hint { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--label-2); }
+        .hint .icon { width: 16px; height: 16px; margin-top: 1px; color: var(--orange); }
+
+        /* ================================================================
+           Scenes list
+           ================================================================ */
+        .scene-list { margin: 0 -12px; }
+        .scene-row { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; transition: background .15s; }
+        .scene-row + .scene-row::before { content: ""; position: absolute; top: 0; left: 60px; right: 12px; border-top: 1px solid var(--separator); }
+        .scene-row:hover { background: var(--hover); }
+        .scene-row:hover::before, .scene-row:hover + .scene-row::before { opacity: 0; }
+        .scene-open {
+            display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 0;
+            border: 0; border-radius: 10px; background: none; color: inherit; text-align: left;
         }
-        
-        /* Notifications */
-        .notif-form {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+        .scene-main { flex: 1; min-width: 0; }
+        .scene-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 15px; font-weight: 600; }
+        .scene-desc { font-size: 13px; color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .scene-meta { margin-top: 1px; font: 11.5px/1.4 var(--mono); color: var(--label-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .scene-meta.error { color: var(--red); }
+        .scene-thumb { width: 104px; flex: none; border-radius: 5px; }
+        .scene-thumb img { image-rendering: auto; }
+        .scene-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+        .scene-row.is-off .scene-icon, .scene-row.is-off .scene-main, .scene-row.is-off .scene-thumb { opacity: .5; }
+        .drag-handle {
+            display: none; width: 30px; height: 36px; margin-right: -4px; padding: 0; flex: none; place-items: center;
+            border: 0; border-radius: 8px; background: none; color: var(--label-3); cursor: grab; touch-action: none;
         }
-        
-        .notif-input {
-            padding: 10px;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text);
-            font-family: inherit;
-            resize: none;
+        .drag-handle .icon { width: 20px; height: 20px; }
+        .scene-list.editing { user-select: none; -webkit-user-select: none; }
+        .scene-list.editing .drag-handle { display: grid; }
+        .scene-list.editing .scene-actions, .scene-list.editing .scene-thumb { display: none; }
+        .scene-list.editing .scene-open { pointer-events: none; }
+        .scene-row.dragging { z-index: 2; background: var(--card); box-shadow: var(--shadow-pop); }
+        .scene-row.dragging .drag-handle { cursor: grabbing; color: var(--accent); }
+        .edit-hint { margin: -6px 0 12px; }
+
+        /* ================================================================
+           Send to display
+           ================================================================ */
+        .send-panel { margin-top: 16px; }
+        .dropzone {
+            display: grid; place-items: center; gap: 4px; width: 100%; padding: 26px 16px;
+            border: 1.5px dashed color-mix(in srgb, var(--label-3) 55%, transparent); border-radius: 14px;
+            background: transparent; color: var(--label-2); text-align: center; font-size: 13px;
+            transition: border-color .15s, background .15s, color .15s;
         }
-        
-        .notif-input:focus {
-            outline: none;
-            border-color: var(--accent);
+        .dropzone:hover, .dropzone.over { border-color: var(--accent); background: var(--accent-tint); color: var(--accent); }
+        .dropzone > .icon { width: 30px; height: 30px; margin-bottom: 4px; }
+        .dropzone strong { font-size: 15px; font-weight: 600; color: var(--label); }
+        .picked { display: flex; align-items: center; gap: 14px; }
+        .picked .screen { width: 168px; flex: none; }
+        .picked .screen img { object-fit: contain; image-rendering: auto; filter: grayscale(1) contrast(1.2); }
+        .picked-name { font-weight: 600; overflow-wrap: anywhere; }
+        .blank-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .blank-option {
+            display: grid; gap: 8px; padding: 10px; border: 0; border-radius: 14px;
+            background: var(--tile); text-align: left; font-weight: 500;
+            transition: box-shadow .15s, background .15s;
         }
-        
-        /* Tabs */
-        .tabs {
-            display: flex;
-            gap: 4px;
-            padding: 4px;
-            background: var(--bg-input);
-            border-radius: 8px;
-            margin-bottom: 1rem;
+        .blank-option .swatch { aspect-ratio: 250 / 122; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); }
+        .blank-option[aria-checked="true"] { background: var(--accent-tint); box-shadow: 0 0 0 2px var(--accent); }
+
+        /* ================================================================
+           Notifications
+           ================================================================ */
+        .notif-list { margin: 18px -12px 0; }
+        .notif { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px 10px 28px; border-radius: 12px; }
+        .notif + .notif::before { content: ""; position: absolute; top: 0; left: 28px; right: 12px; border-top: 1px solid var(--separator); }
+        .unread-dot { position: absolute; top: 17px; left: 11px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+        .notif-body { flex: 1; min-width: 0; }
+        .notif-top { display: flex; align-items: center; gap: 8px; }
+        .notif-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .notif.read .notif-title { font-weight: 500; color: var(--label-2); }
+        .notif-time { font: 12px var(--mono); color: var(--label-3); }
+        .notif-msg { font-size: 13px; color: var(--label-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+
+        /* ================================================================
+           Device
+           ================================================================ */
+        .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+        .stat { min-width: 0; padding: 12px; border-radius: 14px; background: var(--tile); }
+        .stat-label { font-size: 12px; font-weight: 500; color: var(--label-2); }
+        .stat-value {
+            display: flex; align-items: baseline; gap: 3px; margin-top: 3px;
+            font: 600 19px/1.25 var(--font-display); letter-spacing: -.02em; white-space: nowrap; overflow: hidden;
         }
-        
-        .tab {
-            flex: 1;
-            padding: 8px 12px;
-            background: transparent;
-            border: none;
-            border-radius: 6px;
-            color: var(--text-dim);
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-family: inherit;
+        .stat-value small { font-size: 13px; font-weight: 500; letter-spacing: 0; color: var(--label-2); }
+        .stat-note { margin-top: 2px; font-size: 12px; color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .stat-note .icon { width: 13px; height: 13px; }
+        .bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; margin-left: 6px; align-self: center; }
+        .bars i { width: 4px; border-radius: 1.5px; background: var(--separator); }
+        .bars i:nth-child(1) { height: 30%; }
+        .bars i:nth-child(2) { height: 55%; }
+        .bars i:nth-child(3) { height: 78%; }
+        .bars i:nth-child(4) { height: 100%; }
+        .bars i.on { background: var(--label); }
+        .bars.weak i.on { background: var(--orange-fill); }
+        /* Meter: the track is a lighter step of the fill's own hue */
+        .meter { height: 6px; margin-top: 8px; border-radius: 999px; background: var(--accent-tint); overflow: hidden; }
+        .meter span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .4s var(--ease); }
+        .meter.warn { background: var(--orange-tint); }
+        .meter.warn span { background: var(--orange-fill); }
+        .meter.crit { background: var(--red-tint); }
+        .meter.crit span { background: var(--red-fill); }
+        .kv { display: grid; grid-template-columns: auto minmax(0, 1fr); margin: 14px 0 0; font-size: 13px; }
+        .kv dt, .kv dd { margin: 0; padding: 8px 0; border-top: 1px solid var(--separator); }
+        .kv dt { padding-right: 16px; color: var(--label-2); }
+        .kv dd { text-align: right; font: 12.5px/1.5 var(--mono); overflow-wrap: anywhere; }
+        .kv:empty { display: none; }
+        .device-checked { margin-top: 12px; }
+
+        /* ================================================================
+           Activity log
+           ================================================================ */
+        .log { max-height: 300px; margin: 0 -4px; overflow-y: auto; font: 12px/1.5 var(--mono); }
+        .log-row { display: grid; grid-template-columns: 62px 14px minmax(0, 1fr) auto; align-items: baseline; gap: 8px; padding: 5px 4px; border-top: 1px solid var(--separator); }
+        .log-row:first-child { border-top: 0; }
+        .log-time { color: var(--label-3); font-variant-numeric: tabular-nums; }
+        .log-icon { align-self: center; display: flex; }
+        .log-icon .icon { width: 13px; height: 13px; }
+        .log-icon .icon svg { stroke-width: 2.4; }
+        .log-icon.ok { color: var(--green); }
+        .log-icon.error { color: var(--red); }
+        .log-icon.info { color: var(--label-3); }
+        .log-msg { overflow-wrap: anywhere; }
+        .log-detail { color: var(--label-3); white-space: nowrap; }
+
+        .footer { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin-top: 28px; font-size: 12px; color: var(--label-3); }
+        kbd { padding: 1px 6px; border-radius: 5px; background: var(--field); color: var(--label-2); font: 11px var(--mono); }
+
+        /* ================================================================
+           Scene sheet + alert (native <dialog>)
+           ================================================================ */
+        dialog { color: var(--label); }
+        dialog::backdrop { background: rgba(0, 0, 0, .32); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+        .sheet {
+            width: min(600px, calc(100vw - 32px)); max-width: none; max-height: min(88vh, 920px); padding: 0;
+            border: 0; border-radius: 22px; background: var(--sheet-bg); box-shadow: var(--shadow-pop); overflow: hidden;
         }
-        
-        .tab.active {
-            background: var(--bg-card);
-            color: var(--accent);
+        .sheet[open] { display: flex; flex-direction: column; animation: sheet-in .4s var(--ease); }
+        @keyframes sheet-in { from { opacity: 0; transform: translateY(28px) scale(.98); } }
+        .sheet-head {
+            flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 56px; padding: 0 8px;
+            border-bottom: 1px solid var(--separator); background: var(--material-raised);
+            -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
         }
-        
-        .tab:hover:not(.active) {
-            color: var(--text);
+        .sheet-head > :first-child { justify-self: start; }
+        .sheet-head > :last-child { justify-self: end; }
+        .sheet-title { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; white-space: nowrap; }
+        .sheet-body { overflow-y: auto; overscroll-behavior: contain; padding: 18px 18px 28px; }
+        .sheet-preview { padding: 12px; border-radius: 14px; background: var(--sheet-group); }
+        .sheet-preview-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+        .sheet-show { margin-top: 14px; }
+        .group-title { margin: 22px 4px 7px; font-size: 13px; font-weight: 500; color: var(--label-2); }
+        .group { border-radius: 12px; background: var(--sheet-group); overflow: hidden; }
+        .group-row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 46px; padding: 10px 16px; }
+        .group-row + .group-row::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: 1px solid var(--separator); }
+        .group-row .value { color: var(--label-2); text-align: right; }
+        .group-row.stack { flex-direction: column; align-items: stretch; gap: 7px; padding: 12px 16px; }
+        .group-row.stack > label { font-size: 15px; }
+        .group-row .space { justify-content: space-between; }
+        .code-block { display: block; padding: 9px 11px; border-radius: 8px; background: var(--field); font: 12px/1.5 var(--mono); white-space: nowrap; overflow-x: auto; user-select: all; }
+        .error-block { margin: 0; font: 12px/1.45 var(--mono); color: var(--red); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+        .alert {
+            width: min(300px, calc(100vw - 48px)); padding: 0; border: 0; border-radius: 16px; overflow: hidden; text-align: center;
+            background: var(--material-raised); -webkit-backdrop-filter: saturate(180%) blur(30px); backdrop-filter: saturate(180%) blur(30px);
+            box-shadow: var(--shadow-pop);
         }
-        
-        .tab-content {
-            display: none;
-        }
-        
-        .tab-content.active {
-            display: block;
-        }
-        
-        /* Toast */
-        .toast-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1000;
-        }
-        
+        .alert[open] { animation: alert-in .25s var(--ease); }
+        @keyframes alert-in { from { opacity: 0; transform: scale(1.08); } }
+        .alert-body { padding: 20px 18px 16px; }
+        .alert-title { font-size: 16px; font-weight: 600; }
+        .alert-msg { margin-top: 4px; font-size: 13px; line-height: 1.4; }
+        .alert-actions { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--separator); }
+        .alert-actions button { height: 46px; border: 0; background: none; color: var(--accent); font-size: 16px; }
+        .alert-actions button + button { border-left: 1px solid var(--separator); }
+        .alert-actions button:hover { background: var(--hover); }
+        .alert-actions .destructive { color: var(--red); font-weight: 600; }
+
+        /* Toasts (HUD) */
+        .toasts { position: fixed; top: 64px; left: 50%; z-index: 50; display: grid; justify-items: center; gap: 8px; width: max-content; max-width: calc(100vw - 32px); transform: translateX(-50%); pointer-events: none; }
         .toast {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 12px 16px;
-            margin-top: 8px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            animation: slideIn 0.3s ease;
-            font-size: 0.9rem;
+            display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px;
+            background: var(--material-raised); -webkit-backdrop-filter: saturate(180%) blur(24px); backdrop-filter: saturate(180%) blur(24px);
+            box-shadow: 0 8px 28px rgba(0, 0, 0, .14), 0 0 0 .5px var(--separator);
+            font-size: 14px; font-weight: 500; pointer-events: auto; animation: toast-in .35s var(--ease);
         }
-        
-        .toast.success { border-left: 3px solid var(--success); }
-        .toast.error { border-left: 3px solid var(--error); }
-        
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+        .toast .icon { width: 18px; height: 18px; }
+        .toast.ok .icon { color: var(--green); }
+        .toast.error .icon { color: var(--red); }
+        .toast.out { animation: toast-out .25s ease forwards; }
+        @keyframes toast-in { from { opacity: 0; transform: translateY(-12px) scale(.96); } }
+        @keyframes toast-out { to { opacity: 0; transform: translateY(-8px) scale(.98); } }
+
+        /* ================================================================
+           Responsive
+           ================================================================ */
+        @media (max-width: 1080px) {
+            .grid { grid-template-columns: minmax(0, 1fr); max-width: 760px; margin: 0 auto; }
         }
-        
-        /* Log */
-        .log {
-            background: var(--bg-input);
-            border-radius: 6px;
-            padding: 12px;
-            max-height: 150px;
-            overflow-y: auto;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
+        @media (max-width: 640px) {
+            .nav-inner { padding: 0 16px; }
+            .brand small, .status-pill .meta { display: none; }
+            .page { padding: 16px 16px 40px; }
+            .grid, .col { gap: 16px; }
+            .card { padding: 18px 16px 20px; border-radius: 18px; }
+            .hero { padding: 20px 16px; }
+            .now-title h1 { font-size: 26px; }
+            .device { padding: 10px 10px 26px; border-radius: 20px; }
+            .list-row.wrap { flex-direction: column; align-items: stretch; }
+            .interval { justify-content: flex-start; }
+            .scene-thumb { display: none; }
+            .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .picked { flex-direction: column; align-items: stretch; }
+            .picked .screen { width: 100%; }
+            .sheet { width: 100vw; max-height: 92vh; margin: auto 0 0; border-radius: 16px 16px 0 0; }
+            .sheet[open] { animation-name: sheet-up; }
+            @keyframes sheet-up { from { transform: translateY(100%); } }
         }
-        
-        .log-entry {
-            padding: 3px 0;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        .log-entry:last-child { border-bottom: none; }
-        .log-time { color: var(--text-muted); }
-        .log-ok { color: var(--success); }
-        .log-error { color: var(--error); }
-        
-        /* Modal */
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s;
-        }
-        
-        .modal-overlay.open {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        .modal {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            width: 90%;
-            max-width: 500px;
-            max-height: 80vh;
-            overflow-y: auto;
-            transform: scale(0.95);
-            transition: transform 0.3s;
-        }
-        
-        .modal-overlay.open .modal {
-            transform: scale(1);
-        }
-        
-        .modal-header {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .modal-title {
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .modal-close {
-            background: none;
-            border: none;
-            color: var(--text-dim);
-            font-size: 1.5rem;
-            cursor: pointer;
-            padding: 0;
-            line-height: 1;
-        }
-        
-        .modal-close:hover { color: var(--text); }
-        
-        .modal-body { padding: 1.25rem; }
-        
-        .modal-footer {
-            padding: 1rem 1.25rem;
-            border-top: 1px solid var(--border);
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
         }
     </style>
+{% endraw %}
 </head>
 <body>
-    <header class="header">
-        <div class="logo">
-            <span class="logo-icon">📺</span>
-            <h1>E-Paper Scene Manager</h1>
+{% raw %}
+<noscript><p style="padding: 24px; text-align: center;">This dashboard needs JavaScript.</p></noscript>
+
+<header class="nav">
+    <div class="nav-inner">
+        <div class="brand">
+            <span class="brand-mark" aria-hidden="true"><span></span></span>
+            <span>E-Paper <small>Scene Manager</small></span>
         </div>
-        <div class="header-actions">
-            <div class="status-badge">
-                <span class="status-dot" id="statusDot"></span>
-                <span id="statusText">Connecting...</span>
-            </div>
+        <div class="nav-spacer"></div>
+        <button class="status-pill" id="statusPill" type="button" data-state="checking" title="Device status">
+            <span class="dot"></span><span id="statusText">Checking…</span><span class="meta" id="statusMeta"></span>
+        </button>
+        <a class="btn btn-sm btn-plain" href="/docs" target="_blank" rel="noopener">API <span data-icon="external"></span></a>
+    </div>
+</header>
+
+<main class="page">
+    <div class="grid">
+        <div class="col">
+
+            <!-- Now showing -->
+            <section class="card hero" aria-labelledby="nowName">
+                <div class="eyebrow" id="nowKind">Now showing</div>
+                <div class="now-title">
+                    <span id="nowIcon" hidden></span>
+                    <h1 id="nowName">Nothing yet</h1>
+                </div>
+                <div class="now-meta" id="nowMeta">No image sent since the server started</div>
+
+                <div class="device">
+                    <div class="screen" id="screen">
+                        <img id="screenImg" alt="Image currently on the e-paper display" hidden>
+                        <div class="screen-empty" id="screenEmpty">
+                            <strong>Nothing on the display yet</strong>
+                            <span>Show a scene, or wait for the next rotation.</span>
+                        </div>
+                        <div class="screen-busy"><span class="spinner"></span><span>Updating display…</span></div>
+                    </div>
+                    <div class="device-label"><span class="device-led" id="deviceLed"></span>2.13″ e-Paper · 250 × 122</div>
+                </div>
+                <div class="specs"><span>250 × 122 px</span><span>1-bit</span><span>4,000 B frame</span><span>full refresh ≈ 2 s</span></div>
+
+                <div class="controls">
+                    <button class="btn btn-icon btn-lg" id="prevBtn" type="button" title="Previous scene (←)" aria-label="Previous scene"><span data-icon="chevron-left"></span></button>
+                    <button class="btn btn-tinted btn-lg" id="refreshBtn" type="button" title="Re-render the current scene and send it (R)"><span data-icon="refresh"></span><span>Refresh</span></button>
+                    <button class="btn btn-icon btn-lg" id="nextBtn" type="button" title="Next scene (→)" aria-label="Next scene"><span data-icon="chevron-right"></span></button>
+                </div>
+
+                <div class="settings-list">
+                    <div class="list-row">
+                        <div>
+                            <div class="row-title" id="rotationLabel">Auto-rotate</div>
+                            <div class="row-sub" id="rotationSub">—</div>
+                        </div>
+                        <button class="switch" id="rotationSwitch" type="button" role="switch" aria-checked="false" aria-labelledby="rotationLabel"></button>
+                    </div>
+                    <div class="list-row wrap">
+                        <div class="row-title">Interval</div>
+                        <div class="interval">
+                            <div class="segmented" id="intervalSeg" role="radiogroup" aria-label="Rotation interval"></div>
+                            <input class="input mono interval-custom" id="intervalCustom" type="number" min="10" max="3600" step="10" aria-label="Interval in seconds" hidden>
+                        </div>
+                    </div>
+                    <div class="list-row" id="upNextRow">
+                        <div class="row-title">Up next</div>
+                        <div class="up-next-value"><span id="upNext">—</span><span class="countdown" id="countdown"></span></div>
+                    </div>
+                    <div class="progress" id="progress" aria-hidden="true"><span id="progressFill"></span></div>
+                    <p class="hint" id="intervalHint" hidden><span data-icon="info"></span><span>Every change is a full e-paper refresh, which flashes the panel. Waveshare recommends at least 3 minutes between refreshes.</span></p>
+                </div>
+            </section>
+
+            <!-- Scenes -->
+            <section class="card" aria-labelledby="scenesTitle">
+                <div class="card-head">
+                    <div>
+                        <h2 class="card-title" id="scenesTitle">Scenes</h2>
+                        <p class="card-sub" id="scenesSub">—</p>
+                    </div>
+                    <div class="row">
+                        <button class="btn btn-sm btn-plain" id="orderCancel" type="button" hidden>Cancel</button>
+                        <button class="btn btn-sm btn-tinted" id="orderBtn" type="button">Edit order</button>
+                    </div>
+                </div>
+                <p class="help edit-hint" id="orderHint" hidden>Drag the handles, or focus one and press ↑ ↓. The order is used by auto-rotate.</p>
+                <div class="scene-list" id="sceneList" role="list"></div>
+            </section>
+            <!-- Activity -->
+            <section class="card" aria-labelledby="logTitle">
+                <div class="card-head">
+                    <div>
+                        <h2 class="card-title" id="logTitle">Activity</h2>
+                        <p class="card-sub">API calls from this page and display changes</p>
+                    </div>
+                    <button class="btn btn-sm btn-plain" id="logClear" type="button">Clear</button>
+                </div>
+                <div class="log" id="log"></div>
+            </section>
         </div>
-    </header>
-    
-    <div class="container">
-        <div class="grid">
-            <!-- Main Content -->
-            <div class="main-content">
-                <!-- Rotation Controls -->
-                <div class="card" style="margin-bottom: 1.5rem;">
-                    <div class="card-body">
-                        <div class="rotation-controls">
-                            <div class="rotation-toggle" id="rotationToggle" onclick="toggleRotation()"></div>
-                            <div class="rotation-info">
-                                <div class="rotation-label">Auto Rotation</div>
-                                <div class="rotation-status" id="rotationStatus">Loading...</div>
-                            </div>
-                            <span style="color: var(--text-dim); font-size: 0.85rem;">Interval:</span>
-                            <input type="number" class="interval-input" id="intervalInput" value="60" min="10" max="3600" onchange="updateInterval()">
-                            <span style="color: var(--text-dim); font-size: 0.85rem;">sec</span>
-                        </div>
-                        <div class="controls">
-                            <button class="btn btn-icon" onclick="prevScene()" title="Previous">◀</button>
-                            <button class="btn btn-primary" onclick="refreshDisplay()">
-                                🔄 Refresh Now
-                            </button>
-                            <button class="btn btn-icon" onclick="nextScene()" title="Next">▶</button>
-                        </div>
+
+        <div class="col">
+
+            <!-- Send to display -->
+            <section class="card" aria-labelledby="sendTitle">
+                <div class="card-head">
+                    <div>
+                        <h2 class="card-title" id="sendTitle">Send to display</h2>
+                        <p class="card-sub">Shows right away and stays up for one rotation interval</p>
                     </div>
                 </div>
-                
-                <!-- Scene List -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <span>🎬</span>
-                            Scenes
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="scene-list" id="sceneList">
-                            <!-- Scenes will be loaded here -->
-                        </div>
-                    </div>
+                <div class="segmented full" id="sendSeg" role="radiogroup" aria-label="What to send">
+                    <button type="button" role="radio" aria-checked="true" data-value="message">Message</button>
+                    <button type="button" role="radio" aria-checked="false" data-value="image">Image</button>
+                    <button type="button" role="radio" aria-checked="false" data-value="blank">Blank</button>
                 </div>
-                
-                <!-- Notifications -->
-                <div class="card" style="margin-top: 1.5rem;">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <span>🔔</span>
-                            Send Notification
-                        </div>
-                        <button class="btn btn-sm" onclick="clearNotifications()">Clear All</button>
+
+                <form class="send-panel" id="sendMessage" data-panel="message">
+                    <div class="field">
+                        <label class="field-label" for="msgTitle">Title</label>
+                        <input class="input" id="msgTitle" maxlength="40" placeholder="Message" autocomplete="off">
                     </div>
-                    <div class="card-body">
-                        <div class="notif-form">
-                            <input type="text" id="notifTitle" placeholder="Title" class="notif-input">
-                            <textarea id="notifMessage" placeholder="Message..." class="notif-input" rows="2"></textarea>
-                            <select id="notifPriority" class="notif-input">
-                                <option value="low">Low Priority</option>
-                                <option value="normal" selected>Normal Priority</option>
-                                <option value="high">High Priority</option>
-                            </select>
-                            <button class="btn btn-primary" onclick="sendNotification()">Send Notification</button>
+                    <div class="field">
+                        <label class="field-label" for="msgText">Text</label>
+                        <textarea class="input" id="msgText" rows="3" maxlength="300" placeholder="What should the display say?"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <p class="help" id="msgHelp">Wraps to 5 lines under the title bar</p>
+                        <button class="btn btn-primary" type="submit"><span data-icon="play"></span><span>Send</span></button>
+                    </div>
+                </form>
+
+                <form class="send-panel" id="sendImage" data-panel="image" hidden>
+                    <input type="file" id="imageFile" accept="image/*" hidden>
+                    <button class="dropzone" id="dropzone" type="button">
+                        <span data-icon="upload"></span>
+                        <strong>Drop an image or choose a file</strong>
+                        <span>Scaled to fit 250 × 122, dithered to black &amp; white</span>
+                    </button>
+                    <div class="picked" id="imagePicked" hidden>
+                        <div class="screen"><img id="imagePreview" alt="Selected image"></div>
+                        <div class="grow">
+                            <div class="picked-name" id="imageName"></div>
+                            <div class="help mono" id="imageMeta"></div>
+                            <button class="btn btn-sm btn-plain btn-danger" id="imageRemove" type="button" style="margin: 6px 0 0 -10px;">Remove</button>
                         </div>
                     </div>
+                    <div class="form-actions">
+                        <p class="help">Approximate preview, the panel gets a dithered version</p>
+                        <button class="btn btn-primary" id="imageSend" type="submit" disabled><span data-icon="play"></span><span>Send</span></button>
+                    </div>
+                </form>
+
+                <form class="send-panel" id="sendBlank" data-panel="blank" hidden>
+                    <div class="blank-options" id="blankSeg" role="radiogroup" aria-label="Color">
+                        <button class="blank-option" type="button" role="radio" aria-checked="true" data-value="white"><span class="swatch" style="background: #ecebe4;"></span>White</button>
+                        <button class="blank-option" type="button" role="radio" aria-checked="false" data-value="black"><span class="swatch" style="background: #1d1d1f;"></span>Black</button>
+                    </div>
+                    <div class="form-actions">
+                        <p class="help">Clears the whole panel</p>
+                        <button class="btn btn-primary" type="submit"><span data-icon="play"></span><span>Clear display</span></button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Notifications -->
+            <section class="card" aria-labelledby="notifTitle">
+                <div class="card-head">
+                    <div>
+                        <h2 class="card-title" id="notifTitle">Notifications</h2>
+                        <p class="card-sub" id="notifSub">—</p>
+                    </div>
+                    <button class="btn btn-sm btn-plain btn-danger" id="notifClear" type="button" hidden>Clear all</button>
                 </div>
-                
-                <!-- Log -->
-                <div class="card" style="margin-top: 1.5rem;">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <span>📜</span>
-                            Activity Log
-                        </div>
-                        <button class="btn btn-sm" onclick="clearLog()">Clear</button>
-                    </div>
-                    <div class="card-body">
-                        <div class="log" id="log">
-                            <div class="log-entry">
-                                <span class="log-time">[--:--:--]</span> Ready
-                            </div>
-                        </div>
-                    </div>
+                <div class="callout callout-orange" id="notifOff" hidden>
+                    <span data-icon="warning"></span>
+                    <div class="grow">The Notifications scene is off, so notifications won't appear on the display.</div>
+                    <button class="btn btn-sm btn-tinted" id="notifEnable" type="button">Turn on</button>
                 </div>
-            </div>
-            
-            <!-- Sidebar -->
-            <div class="sidebar">
-                <!-- Preview -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <span>👁️</span>
-                            Live Preview
-                        </div>
+                <form id="notifForm">
+                    <div class="field">
+                        <label class="field-label" for="notifTitleInput">Title</label>
+                        <input class="input" id="notifTitleInput" maxlength="40" placeholder="Backup finished" autocomplete="off" required>
                     </div>
-                    <div class="card-body">
-                        <div class="preview-container">
-                            <img src="" alt="Preview" class="preview-image" id="previewImage" style="display: none;">
-                            <div class="preview-placeholder" id="previewPlaceholder">
-                                <p>No preview</p>
-                            </div>
-                        </div>
-                        <div style="text-align: center; margin-top: 10px;">
-                            <span id="currentSceneName" style="color: var(--accent); font-weight: 500;">--</span>
-                        </div>
+                    <div class="field">
+                        <label class="field-label" for="notifMessage">Message</label>
+                        <textarea class="input" id="notifMessage" rows="2" maxlength="200" placeholder="TrueNAS replication completed" required></textarea>
                     </div>
+                    <div class="form-actions">
+                        <div class="segmented" id="notifPriority" role="radiogroup" aria-label="Priority" style="margin-right: auto;">
+                            <button type="button" role="radio" aria-checked="false" data-value="low">Low</button>
+                            <button type="button" role="radio" aria-checked="true" data-value="normal">Normal</button>
+                            <button type="button" role="radio" aria-checked="false" data-value="high">High</button>
+                        </div>
+                        <button class="btn btn-primary" type="submit"><span data-icon="plus"></span><span>Add</span></button>
+                    </div>
+                </form>
+                <div class="notif-list" id="notifList"></div>
+            </section>
+
+            <!-- Device -->
+            <section class="card" id="deviceCard" aria-labelledby="deviceTitle">
+                <div class="card-head">
+                    <div>
+                        <h2 class="card-title" id="deviceTitle">Device</h2>
+                        <p class="card-sub">ESP32 · Waveshare 2.13″ V4</p>
+                    </div>
+                    <span class="badge badge-gray" id="deviceBadge">Checking…</span>
                 </div>
-                
-                <!-- Device Settings -->
-                <div class="card" style="margin-top: 1rem;">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <span>⚙️</span>
-                            Device
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-group">
-                            <label>ESP32 IP Address</label>
-                            <input type="text" id="deviceIp" value="{{ device_ip }}" placeholder="192.168.1.100">
-                        </div>
-                        <button class="btn" style="width: 100%;" onclick="saveDeviceConfig()">
-                            Save & Test
-                        </button>
-                        
-                        <div class="device-grid" style="margin-top: 1rem;">
-                            <div class="device-item">
-                                <div class="device-label">IP</div>
-                                <div class="device-value" id="infoIp">-</div>
-                            </div>
-                            <div class="device-item">
-                                <div class="device-label">Signal</div>
-                                <div class="device-value" id="infoRssi">-</div>
-                            </div>
-                            <div class="device-item">
-                                <div class="device-label">Uptime</div>
-                                <div class="device-value" id="infoUptime">-</div>
-                            </div>
-                            <div class="device-item">
-                                <div class="device-label">RAM</div>
-                                <div class="device-value" id="infoRam">-</div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="callout callout-red" id="deviceOffline" hidden>
+                    <span data-icon="warning"></span>
+                    <div class="grow"><span id="deviceOfflineText"></span><span class="mono" id="deviceOfflineError"></span></div>
                 </div>
-            </div>
+                <div class="stats" id="deviceStats" hidden></div>
+                <dl class="kv" id="deviceInfo"></dl>
+                <hr class="divider">
+                <form id="deviceForm">
+                    <div class="field-pair">
+                        <div class="field">
+                            <label class="field-label" for="deviceIp">Address</label>
+                            <input class="input mono" id="deviceIp" placeholder="192.168.1.231" autocomplete="off" spellcheck="false" required>
+                        </div>
+                        <div class="field">
+                            <label class="field-label" for="devicePort">Port</label>
+                            <input class="input mono" id="devicePort" type="number" min="1" max="65535" value="80">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <a class="btn btn-sm btn-plain" id="deviceLink" href="#" target="_blank" rel="noopener">Device page <span data-icon="external"></span></a>
+                        <button class="btn btn-primary" type="submit">Save &amp; test</button>
+                    </div>
+                    <p class="help device-checked">Kept until the server restarts. Set <code>ESP32_IP</code> to make it permanent. <span id="deviceChecked"></span></p>
+                </form>
+            </section>
+
         </div>
     </div>
-    
-    <!-- Scene Settings Modal -->
-    <div class="modal-overlay" id="settingsModal">
-        <div class="modal">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <span id="modalIcon">⚙️</span>
-                    <span id="modalTitle">Scene Settings</span>
-                </div>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
-            </div>
-            <div class="modal-body" id="modalBody">
-                <!-- Settings form will be generated here -->
-            </div>
-            <div class="modal-footer">
-                <button class="btn" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="saveSceneSettings()">Save Settings</button>
-            </div>
-        </div>
+
+    <footer class="footer">
+        <span><kbd>←</kbd> <kbd>→</kbd> previous / next scene</span>
+        <span><kbd>R</kbd> refresh</span>
+        <span>Interactive API docs at <a href="/docs" target="_blank" rel="noopener">/docs</a></span>
+    </footer>
+</main>
+
+<dialog class="sheet" id="sceneSheet" aria-labelledby="sheetTitle">
+    <div class="sheet-head">
+        <button class="btn btn-plain" id="sheetCancel" type="button">Cancel</button>
+        <div class="sheet-title" id="sheetTitle"></div>
+        <button class="btn btn-plain btn-strong" id="sheetSave" type="button" disabled>Save</button>
     </div>
-    
-    <div class="toast-container" id="toastContainer"></div>
-    
-    <script>
-        // State
-        let scenes = [];
-        let currentSceneId = null;
-        let editingSceneId = null;
-        
-        // API
-        async function api(endpoint, options = {}) {
-            const res = await fetch('/api/' + endpoint, options);
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Request failed');
-            return data;
+    <div class="sheet-body" id="sheetBody"></div>
+</dialog>
+
+<dialog class="alert" id="alertDialog" aria-labelledby="alertTitle">
+    <div class="alert-body">
+        <div class="alert-title" id="alertTitle"></div>
+        <div class="alert-msg" id="alertMsg"></div>
+    </div>
+    <div class="alert-actions">
+        <button id="alertCancel" type="button">Cancel</button>
+        <button id="alertOk" type="button">OK</button>
+    </div>
+</dialog>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+{% endraw %}
+
+<script>window.EPAPER = { deviceIp: {{ device_ip|tojson }} };</script>
+{% raw %}
+<script>
+'use strict';
+
+/* ====================================================================
+   Helpers
+   ==================================================================== */
+
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+// Line icons in the spirit of SF Symbols (24x24, stroked)
+const ICONS = {
+    'chevron-left': '<path d="M15 5l-7 7 7 7"/>',
+    'chevron-right': '<path d="M9 5l7 7-7 7"/>',
+    'refresh': '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4.5H15"/>',
+    'play': '<path d="M8 5.8v12.4a.8.8 0 0 0 1.2.7l10-6.2a.8.8 0 0 0 0-1.4l-10-6.2a.8.8 0 0 0-1.2.7z" fill="currentColor" stroke="none"/>',
+    'check': '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    'xmark': '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+    'info': '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.1"/>',
+    'warning': '<path d="M10.3 4.2L2.8 17.5A2 2 0 0 0 4.5 20.5h15a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4.5M12 17v.1"/>',
+    'external': '<path d="M14 5h5v5M19 5l-8 8"/><path d="M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4"/>',
+    'grip': '<path d="M5 8h14M5 12h14M5 16h14"/>',
+    'copy': '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/>',
+    'eye': '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+    'eye-off': '<path d="M3.5 3.5l17 17"/><path d="M10.6 5.6a9.8 9.8 0 0 1 1.4-.1c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3.2 3.9M6.5 7.3A16 16 0 0 0 2.5 12S6 18.5 12 18.5a9.4 9.4 0 0 0 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+    'photo': '<rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.5" cy="10" r="1.5"/><path d="M21 15.5l-5-5-9 8.5"/>',
+    'upload': '<path d="M12 15V4.5M7.5 9L12 4.5 16.5 9"/><path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>',
+    'plus': '<path d="M12 5v14M5 12h14"/>',
+    'clock': '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    'chart': '<path d="M3.5 17.5l5-5.5 4 3.5 7.5-8.5"/><path d="M15 7h5v5"/>',
+    'bitcoin': '<path d="M8 6h5a3 3 0 0 1 0 6H8zM8 12h6a3 3 0 0 1 0 6H8z"/><path d="M8 4.5v15M10.5 3.5v2.5M13 3.5v2.5M10.5 18v2.5M13 18v2.5"/>',
+    'weather': '<circle cx="8.5" cy="8.5" r="3"/><path d="M8.5 2.8v1.2M2.8 8.5H4M4.5 4.5l.8.8M12.5 4.5l-.8.8"/><path d="M9.5 20h8a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.4-.6A3.8 3.8 0 0 0 9.5 20z"/>',
+    'bell': '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
+    'printer': '<path d="M7 9V3.5h10V9"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v6.5H7z"/>',
+    'message': '<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4.5 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M7.5 9.5h9M7.5 12.5h6"/>',
+    'square': '<rect x="4" y="6" width="16" height="12" rx="2"/>',
+    'dot': '<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>',
+};
+
+function iconSvg(name) {
+    return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+}
+
+function icon(name) {
+    const span = document.createElement('span');
+    span.className = 'icon';
+    span.innerHTML = iconSvg(name);  // trusted constants only
+    return span;
+}
+
+function hydrateIcons(root = document) {
+    for (const el of $$('[data-icon]', root)) {
+        el.classList.add('icon');
+        el.innerHTML = iconSvg(el.dataset.icon);
+    }
+}
+
+// Build DOM nodes without innerHTML, so text from the server or external
+// APIs (errors, notification titles, ...) is never parsed as HTML
+function h(tag, props, ...children) {
+    const el = document.createElement(tag);
+    for (const [key, value] of Object.entries(props || {})) {
+        if (value === null || value === undefined || value === false) continue;
+        if (key === 'class') el.className = value;
+        else if (key === 'dataset') Object.assign(el.dataset, value);
+        else if (key === 'style') el.style.cssText = value;
+        else if (key.startsWith('on') && typeof value === 'function') el.addEventListener(key.slice(2), value);
+        else if (typeof value !== 'string' && key in el) el[key] = value;
+        else el.setAttribute(key, value === true ? '' : value);
+    }
+    for (const child of children.flat(Infinity)) {
+        if (child === null || child === undefined || child === false || child === '') continue;
+        el.append(child instanceof Node ? child : String(child));
+    }
+    return el;
+}
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+const fmt = {
+    // 0:42 / 1:02:03
+    clock(seconds) {
+        const s = Math.max(0, Math.ceil(seconds));
+        const hours = Math.floor(s / 3600);
+        const minutes = Math.floor((s % 3600) / 60);
+        return hours ? `${hours}:${pad2(minutes)}:${pad2(s % 60)}` : `${minutes}:${pad2(s % 60)}`;
+    },
+    ago(seconds) {
+        if (seconds < 5) return 'just now';
+        if (seconds < 60) return `${Math.floor(seconds)} s ago`;
+        if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
+        return `${Math.floor(seconds / 86400)} d ago`;
+    },
+    duration(seconds) {
+        const s = Math.floor(seconds);
+        const days = Math.floor(s / 86400);
+        const hours = Math.floor((s % 86400) / 3600);
+        const minutes = Math.floor((s % 3600) / 60);
+        if (days) return `${days}d ${hours}h ${minutes}m`;
+        if (hours) return `${hours}h ${minutes}m`;
+        if (minutes) return `${minutes}m ${s % 60}s`;
+        return `${s % 60}s`;
+    },
+    interval(seconds) {
+        return seconds >= 60 && seconds % 60 === 0 ? `${seconds / 60} min` : `${seconds} s`;
+    },
+    // Server-local ISO timestamp -> "14:07:12" (the display shows server time too)
+    time(iso) { return iso ? iso.slice(11, 19) : '—'; },
+    shortTime(iso) { return iso ? iso.slice(11, 16) : ''; },
+    ms(ms) { return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`; },
+    kb(bytes) { return String(Math.round(bytes / 1024)); },
+    number(n) {
+        return new Intl.NumberFormat('en', n >= 10000 ? { notation: 'compact', maximumFractionDigits: 1 } : {}).format(n);
+    },
+    clockNow() { return new Date().toLocaleTimeString('en-GB', { hour12: false }); },
+};
+
+/* ====================================================================
+   State
+   ==================================================================== */
+
+const state = {
+    scenes: [],
+    manager: null,
+    display: null,
+    syncedAt: 0,                 // performance.now() of the last /api/scenes
+    lastFrame: undefined,        // display.last_update we last rendered
+    notifications: [],
+    unread: 0,
+    device: null,
+    deviceState: 'checking',     // checking | online | offline
+    deviceError: null,
+    deviceCheckedAt: null,
+    deviceSyncedAt: 0,
+    config: { ip: (window.EPAPER && window.EPAPER.deviceIp) || '', port: 80 },
+    serverDown: false,
+    pending: 0,                  // frames being sent from this page
+    editingOrder: false,
+    customInterval: false,
+    imageFile: null,
+    imageUrl: null,
+    blankWhite: true,
+    priority: 'normal',
+    sceneSig: '',
+    notifSig: '',
+};
+
+const INTERVAL_PRESETS = [30, 60, 120, 300, 600];
+
+const SCENE_LOOK = {
+    stocks: { icon: 'chart', tint: 'green' },
+    bitcoin: { icon: 'bitcoin', tint: 'orange' },
+    weather: { icon: 'weather', tint: 'blue' },
+    notifications: { icon: 'bell', tint: 'red' },
+    network: { icon: 'printer', tint: 'indigo' },
+    system: { icon: 'clock', tint: 'gray' },
+};
+
+const KIND_LOOK = {
+    message: { icon: 'message', tint: 'teal', label: 'Message' },
+    image: { icon: 'photo', tint: 'purple', label: 'Image' },
+    blank: { icon: 'square', tint: 'gray', label: 'Blank' },
+};
+
+function sceneTile(scene, size = '') {
+    const look = SCENE_LOOK[scene.id];
+    const tile = h('span', { class: `scene-icon ${size} tint-${look ? look.tint : 'gray'}`, 'aria-hidden': 'true' });
+    // Scenes added later fall back to their emoji
+    tile.append(look ? icon(look.icon) : (scene.icon || '•'));
+    return tile;
+}
+
+function kindTile(kind, size = '') {
+    const look = KIND_LOOK[kind] || { icon: 'square', tint: 'gray' };
+    return h('span', { class: `scene-icon ${size} tint-${look.tint}`, 'aria-hidden': 'true' }, icon(look.icon));
+}
+
+function describeDisplay() {
+    const d = state.display || {};
+    if (!d.kind) return 'nothing yet';
+    if (d.kind === 'scene') return d.name;
+    return `${(KIND_LOOK[d.kind] || {}).label || d.kind}: ${d.name}`;
+}
+
+/* ====================================================================
+   API, activity log, toasts, dialogs
+   ==================================================================== */
+
+async function api(path, { method = 'GET', json, form, quiet = method === 'GET' } = {}) {
+    const options = { method, headers: {} };
+    if (json !== undefined) {
+        options.headers['Content-Type'] = 'application/json';
+        options.body = JSON.stringify(json);
+    } else if (form) {
+        options.body = form;
+    }
+
+    const label = `${method} /api/${path.split('?')[0]}`;
+    const started = performance.now();
+    let res;
+    try {
+        res = await fetch(`/api/${path}`, options);
+    } catch (err) {
+        if (!quiet) log('error', label, 'network error');
+        throw new Error('Server unreachable');
+    }
+
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { /* not JSON */ }
+
+    if (!quiet) log(res.ok ? 'ok' : 'error', label, `${res.status} · ${fmt.ms(performance.now() - started)}`);
+    if (!res.ok) throw new Error(errorText(data) || `${res.status} ${res.statusText}`);
+    return data;
+}
+
+function errorText(data) {
+    const detail = data && (data.detail ?? data.error);
+    if (Array.isArray(detail)) return detail.map((d) => d.msg || JSON.stringify(d)).join('; ');
+    return typeof detail === 'string' ? detail : null;
+}
+
+const logEntries = [];
+
+function log(level, message, detail = '') {
+    logEntries.unshift({ time: fmt.clockNow(), level, message, detail });
+    if (logEntries.length > 150) logEntries.length = 150;
+    renderLog();
+}
+
+function renderLog() {
+    const el = $('#log');
+    if (!logEntries.length) {
+        el.replaceChildren(h('div', { class: 'empty' }, 'Nothing yet'));
+        return;
+    }
+    el.replaceChildren(...logEntries.map((entry) => h('div', { class: 'log-row' },
+        h('span', { class: 'log-time' }, entry.time),
+        h('span', { class: `log-icon ${entry.level}` }, icon(entry.level === 'ok' ? 'check' : entry.level === 'error' ? 'xmark' : 'dot')),
+        h('span', { class: 'log-msg' }, entry.message),
+        h('span', { class: 'log-detail' }, entry.detail),
+    )));
+}
+
+function toast(message, type = 'ok') {
+    const el = h('div', { class: `toast ${type}`, role: type === 'error' ? 'alert' : 'status' },
+        icon(type === 'error' ? 'warning' : 'check'), h('span', {}, message));
+    $('#toasts').append(el);
+    setTimeout(() => {
+        el.classList.add('out');
+        setTimeout(() => el.remove(), 300);
+    }, type === 'error' ? 4500 : 2600);
+}
+
+function confirmDialog({ title, message = '', confirm = 'OK', destructive = false }) {
+    const dialog = $('#alertDialog');
+    const ok = $('#alertOk');
+    const cancel = $('#alertCancel');
+    $('#alertTitle').textContent = title;
+    $('#alertMsg').textContent = message;
+    ok.textContent = confirm;
+    ok.classList.toggle('destructive', destructive);
+
+    return new Promise((resolve) => {
+        const finish = (value) => {
+            ok.onclick = cancel.onclick = dialog.oncancel = null;
+            dialog.close();
+            resolve(value);
+        };
+        ok.onclick = () => finish(true);
+        cancel.onclick = () => finish(false);
+        dialog.oncancel = (event) => { event.preventDefault(); finish(false); };
+        dialog.showModal();
+        (destructive ? cancel : ok).focus();
+    });
+}
+
+async function copyText(text, message = 'Copied') {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            // Clipboard API needs HTTPS/localhost; plain http on the LAN gets the old way.
+            // Append inside the open dialog: everything outside a modal is inert.
+            const area = h('textarea', { style: 'position: fixed; opacity: 0;' });
+            area.value = text;
+            ($('dialog[open]') || document.body).append(area);
+            area.select();
+            document.execCommand('copy');
+            area.remove();
         }
-        
-        // Logging
-        function log(message, type = 'ok') {
-            const logEl = document.getElementById('log');
-            const time = new Date().toLocaleTimeString();
-            const cls = type === 'error' ? 'log-error' : 'log-ok';
-            logEl.innerHTML = `<div class="log-entry"><span class="log-time">[${time}]</span> <span class="${cls}">${message}</span></div>` + logEl.innerHTML;
+        toast(message);
+    } catch {
+        toast('Copy failed', 'error');
+    }
+}
+
+async function withLoading(button, fn) {
+    if (!button) return fn();
+    const wasDisabled = button.disabled;
+    button.classList.add('is-loading');
+    button.disabled = true;
+    try {
+        return await fn();
+    } finally {
+        button.classList.remove('is-loading');
+        button.disabled = wasDisabled;
+    }
+}
+
+// Anything that sends a new frame to the ESP32: show progress on the screen,
+// then sync. message(result) builds the toast once the new state is loaded.
+// Actions run one at a time in click order, so the last click is what stays
+// on the display (scenes render at different speeds on the server).
+let actionQueue = Promise.resolve();
+
+function displayAction(button, request, message) {
+    state.pending += 1;
+    $('#screen').classList.add('is-busy');
+    const job = withLoading(button, () => actionQueue.then(async () => {
+        try {
+            const result = await request();
+            await refreshScenes().catch(() => {});
+            toast(message(result));
+        } catch (err) {
+            toast(err.message, 'error');
         }
-        
-        function clearLog() {
-            document.getElementById('log').innerHTML = '';
+    }));
+    actionQueue = job;
+    return job.finally(() => {
+        state.pending -= 1;
+        if (!state.pending) $('#screen').classList.remove('is-busy');
+    });
+}
+
+/* ====================================================================
+   Segmented controls and switches
+   ==================================================================== */
+
+function selectSegment(group, value) {
+    for (const button of $$('[role="radio"]', group)) {
+        button.setAttribute('aria-checked', String(button.dataset.value === value));
+    }
+}
+
+function bindSegmented(group, onChange) {
+    group.addEventListener('click', (event) => {
+        const button = event.target.closest('[role="radio"]');
+        if (!button || !group.contains(button)) return;
+        selectSegment(group, button.dataset.value);
+        onChange(button.dataset.value);
+    });
+    group.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        const buttons = $$('[role="radio"]', group);
+        const index = buttons.indexOf(document.activeElement);
+        if (index === -1) return;
+        event.preventDefault();
+        const next = buttons[(index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length];
+        next.focus();
+        next.click();
+    });
+}
+
+function segmented(options, value, onChange, label) {
+    const group = h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': label },
+        options.map((option) => h('button', {
+            type: 'button', role: 'radio', 'aria-checked': String(String(option) === value), dataset: { value: String(option) },
+        }, String(option))));
+    bindSegmented(group, onChange);
+    return group;
+}
+
+function switchEl(checked, onChange, label) {
+    const el = h('button', {
+        class: 'switch', type: 'button', role: 'switch', 'aria-checked': String(checked), 'aria-label': label,
+        onclick: () => {
+            const value = el.getAttribute('aria-checked') !== 'true';
+            el.setAttribute('aria-checked', String(value));
+            onChange(value);
+        },
+    });
+    return el;
+}
+
+/* ====================================================================
+   Now showing + rotation
+   ==================================================================== */
+
+async function refreshScenes() {
+    let data;
+    try {
+        data = await api('scenes');
+    } catch (err) {
+        setServerDown(true);
+        throw err;
+    }
+    setServerDown(false);
+
+    state.scenes = data.scenes || [];
+    state.manager = data.manager || null;
+    state.display = data.display || {};
+    state.syncedAt = performance.now();
+
+    const frame = state.display.last_update || null;
+    if (frame !== state.lastFrame) {
+        const isChange = state.lastFrame !== undefined;
+        state.lastFrame = frame;
+        loadScreenImage(isChange);
+        renderStats(state.deviceState === 'online' ? state.device : null);
+        // Frames sent from here are logged with their API call already
+        if (isChange && frame && !state.pending) log('info', `Display → ${describeDisplay()}`, 'rotation / API');
+    }
+
+    renderNow();
+    renderRotation();
+    renderScenes();
+    renderNotifOff();
+    tick();
+}
+
+function loadScreenImage(flash) {
+    const img = $('#screenImg');
+    if (!state.display.last_update) {
+        img.hidden = true;
+        $('#screenEmpty').hidden = false;
+        return;
+    }
+    const next = new Image();
+    next.onload = () => {
+        img.src = next.src;
+        img.hidden = false;
+        $('#screenEmpty').hidden = true;
+        if (flash) {
+            const screen = $('#screen');
+            screen.classList.remove('flash');
+            void screen.offsetWidth;  // restart the animation
+            screen.classList.add('flash');
         }
-        
-        // Toast
-        function toast(message, type = 'success') {
-            const container = document.getElementById('toastContainer');
-            const t = document.createElement('div');
-            t.className = `toast ${type}`;
-            t.innerHTML = `<span>${type === 'success' ? '✓' : '✗'}</span> ${message}`;
-            container.appendChild(t);
-            setTimeout(() => t.remove(), 3000);
-        }
-        
-        // Preview
-        function showPreview(url) {
-            const img = document.getElementById('previewImage');
-            const placeholder = document.getElementById('previewPlaceholder');
-            img.src = url;
-            img.style.display = 'block';
-            placeholder.style.display = 'none';
-        }
-        
-        function refreshPreview() {
-            showPreview('/api/last-image?_=' + Date.now());
-        }
-        
-        // Scene List
-        function renderSceneList() {
-            const container = document.getElementById('sceneList');
-            container.innerHTML = scenes.map(scene => `
-                <div class="scene-item ${scene.id === currentSceneId ? 'active' : ''} ${!scene.config.enabled ? 'disabled' : ''}"
-                     onclick="showScene('${scene.id}')">
-                    <div class="scene-icon">${scene.icon}</div>
-                    <div class="scene-info">
-                        <div class="scene-name">${scene.name}</div>
-                        <div class="scene-desc">${scene.description}</div>
-                    </div>
-                    <div class="scene-actions">
-                        ${scene.id === currentSceneId ? '<span class="scene-badge current">Active</span>' : ''}
-                        ${scene.last_error ? '<span class="scene-badge error">Error</span>' : ''}
-                        <button class="btn btn-sm btn-icon" onclick="event.stopPropagation(); openSettings('${scene.id}')" title="Settings">⚙️</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-        
-        // Load scenes
-        async function loadScenes() {
-            try {
-                const data = await api('scenes');
-                scenes = data.scenes;
-                currentSceneId = data.manager.current_scene;
-                
-                // Update rotation controls
-                const toggle = document.getElementById('rotationToggle');
-                toggle.classList.toggle('active', data.manager.rotation_enabled);
-                document.getElementById('intervalInput').value = data.manager.rotation_interval;
-                document.getElementById('rotationStatus').textContent = 
-                    data.manager.rotation_enabled ? `Every ${data.manager.rotation_interval}s` : 'Paused';
-                
-                // Update current scene name
-                const currentScene = scenes.find(s => s.id === currentSceneId);
-                document.getElementById('currentSceneName').textContent = 
-                    currentScene ? `${currentScene.icon} ${currentScene.name}` : '--';
-                
-                renderSceneList();
-            } catch (e) {
-                log('Failed to load scenes: ' + e.message, 'error');
+    };
+    next.src = `/api/last-image?t=${encodeURIComponent(state.display.last_update)}`;
+}
+
+function renderNow() {
+    const d = state.display || {};
+    const kindLabel = d.kind && d.kind !== 'scene' ? ` · ${(KIND_LOOK[d.kind] || {}).label || d.kind}` : '';
+    $('#nowKind').textContent = `Now showing${kindLabel}`;
+
+    let tile = null;
+    if (d.kind === 'scene') {
+        const scene = state.scenes.find((s) => s.id === d.scene_id);
+        tile = sceneTile(scene || { id: d.scene_id }, 'lg');
+    } else if (d.kind) {
+        tile = kindTile(d.kind, 'lg');
+    }
+    const slot = $('#nowIcon');
+    if (tile) {
+        tile.id = 'nowIcon';
+        slot.replaceWith(tile);
+    } else {
+        slot.hidden = true;
+    }
+
+    $('#nowName').textContent = d.last_update ? (d.name || 'Unknown') : 'Nothing yet';
+    if (!d.last_update) $('#nowMeta').textContent = 'No image sent since the server started';
+}
+
+function renderRotation() {
+    const m = state.manager;
+    if (!m) return;
+
+    $('#rotationSwitch').setAttribute('aria-checked', String(m.rotation_enabled));
+    const count = m.enabled_scenes.length;
+    $('#rotationSub').textContent = m.rotation_enabled
+        ? `Every ${fmt.interval(m.rotation_interval)} through ${count} scene${count === 1 ? '' : 's'}`
+        : 'Off: the display keeps its current image';
+
+    const isPreset = INTERVAL_PRESETS.includes(m.rotation_interval);
+    selectSegment($('#intervalSeg'), isPreset && !state.customInterval ? String(m.rotation_interval) : 'custom');
+    const custom = $('#intervalCustom');
+    custom.hidden = isPreset && !state.customInterval;
+    if (document.activeElement !== custom) custom.value = m.rotation_interval;
+    $('#intervalHint').hidden = m.rotation_interval >= 180;
+
+    const next = state.scenes.find((s) => s.id === m.next_scene);
+    $('#upNext').replaceChildren(
+        next ? sceneTile(next, 'sm') : '',
+        h('span', {}, next ? next.name : 'No scenes in rotation'),
+    );
+    $('#upNextRow').classList.toggle('is-off', !m.rotation_enabled);
+    $('#progress').hidden = !m.rotation_enabled;
+}
+
+// Runs 4x a second: countdown, progress bar and relative times between polls
+function tick() {
+    const elapsed = (performance.now() - state.syncedAt) / 1000;
+    const m = state.manager;
+    const fill = $('#progressFill');
+
+    if (m && m.rotation_enabled && m.next_rotation_in != null) {
+        const remaining = Math.max(0, m.next_rotation_in - elapsed);
+        $('#countdown').textContent = remaining > 0.5 ? `in ${fmt.clock(remaining)}` : 'now…';
+        const progress = Math.min(1, Math.max(0, 1 - remaining / m.rotation_interval));
+        // Jump back without animating when a new cycle starts
+        fill.style.transition = progress < (fill._progress || 0) ? 'none' : '';
+        fill.style.transform = `scaleX(${progress})`;
+        fill._progress = progress;
+    } else {
+        $('#countdown').textContent = m && !m.rotation_enabled ? 'paused' : '';
+        fill.style.transform = 'scaleX(0)';
+        fill._progress = 0;
+    }
+
+    const d = state.display;
+    if (d && d.last_update) {
+        $('#nowMeta').textContent = `Updated ${fmt.time(d.last_update)} · ${fmt.ago((d.age || 0) + elapsed)}`;
+    }
+
+    const uptime = $('#statUptime');
+    if (uptime && state.device && state.device.uptimeSeconds != null) {
+        uptime.textContent = fmt.duration(state.device.uptimeSeconds + (performance.now() - state.deviceSyncedAt) / 1000);
+    }
+}
+
+function stepScene(direction, button) {
+    return displayAction(button, () => api(`rotation/${direction}`, { method: 'POST' }), () => `Showing ${describeDisplay()}`);
+}
+
+function refreshDisplay(button) {
+    return displayAction(button, () => api('display/refresh', { method: 'POST' }), () => `Refreshed ${describeDisplay()}`);
+}
+
+async function setRotationInterval(value) {
+    let seconds = Math.round(Number(value));
+    if (!Number.isFinite(seconds)) return;
+    seconds = Math.min(3600, Math.max(10, seconds));
+    try {
+        const result = await api(`rotation/interval?interval=${seconds}`, { method: 'POST' });
+        toast(`Interval set to ${fmt.interval(result.interval)}`);
+        await refreshScenes();
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+/* ====================================================================
+   Scenes list
+   ==================================================================== */
+
+function orderedScenes() {
+    const order = (state.manager && state.manager.rotation_order) || [];
+    const rank = (scene) => {
+        const index = order.indexOf(scene.id);
+        return index === -1 ? 999 : index;
+    };
+    return [...state.scenes].sort((a, b) => rank(a) - rank(b));
+}
+
+function renderScenes(force = false) {
+    if (state.editingOrder && !force) return;
+    const m = state.manager || {};
+    const d = state.display || {};
+    const scenes = orderedScenes();
+    const inRotation = scenes.filter((s) => s.config.enabled).length;
+    $('#scenesSub').textContent = `${inRotation} of ${scenes.length} in rotation`;
+
+    // Only rebuild when something visible changed (keeps hover/focus stable)
+    const sig = JSON.stringify([
+        scenes.map((s) => [s.id, s.name, s.description, s.config.enabled, s.last_error, s.last_data_at]),
+        m.next_scene, m.rotation_enabled, d.kind, d.scene_id,
+    ]);
+    if (!force && sig === state.sceneSig) return;
+    state.sceneSig = sig;
+
+    $('#sceneList').replaceChildren(...scenes.map(sceneRow));
+}
+
+function sceneRow(scene) {
+    const m = state.manager || {};
+    const d = state.display || {};
+    const onDisplay = d.kind === 'scene' && d.scene_id === scene.id;
+    const upNext = m.rotation_enabled && m.next_scene === scene.id && !onDisplay;
+
+    const badges = [
+        onDisplay ? h('span', { class: 'badge badge-accent' }, h('span', { class: 'dot' }), 'On display') : null,
+        upNext ? h('span', { class: 'badge badge-gray' }, 'Up next') : null,
+        scene.last_error ? h('span', { class: 'badge badge-red' }, icon('warning'), 'Error') : null,
+    ];
+    const meta = scene.last_error
+        ? h('div', { class: 'scene-meta error', title: scene.last_error }, scene.last_error)
+        : h('div', { class: 'scene-meta' }, scene.last_data_at ? `data ${fmt.time(scene.last_data_at)}` : 'not rendered yet');
+
+    const thumbSrc = `/api/scenes/${encodeURIComponent(scene.id)}/preview?cached=true&v=${encodeURIComponent(scene.last_data_at || 'none')}`;
+
+    return h('div', { class: `scene-row${scene.config.enabled ? '' : ' is-off'}`, role: 'listitem', dataset: { id: scene.id } },
+        h('button', { class: 'drag-handle', type: 'button', 'aria-label': `Move ${scene.name}`, title: 'Drag to reorder' }, icon('grip')),
+        h('button', { class: 'scene-open', type: 'button', 'aria-label': `${scene.name} settings`, onclick: () => openScene(scene.id) },
+            sceneTile(scene),
+            h('div', { class: 'scene-main' },
+                h('div', { class: 'scene-name' }, h('span', {}, scene.name), badges),
+                h('div', { class: 'scene-desc' }, scene.description),
+                meta),
+            h('span', { class: 'screen scene-thumb', 'aria-hidden': 'true' },
+                h('img', { src: thumbSrc, alt: '', loading: 'lazy', decoding: 'async' }))),
+        h('div', { class: 'scene-actions' },
+            h('button', {
+                class: 'btn btn-icon btn-tinted', type: 'button', title: 'Show on display now', 'aria-label': `Show ${scene.name} on the display`,
+                onclick: (event) => showScene(scene.id, event.currentTarget),
+            }, icon('play')),
+            h('button', {
+                class: 'switch', type: 'button', role: 'switch', 'aria-checked': String(scene.config.enabled),
+                'aria-label': `Include ${scene.name} in rotation`, title: 'Include in rotation',
+                onclick: (event) => toggleScene(scene, event.currentTarget),
+            })));
+}
+
+function showScene(id, button) {
+    const scene = state.scenes.find((s) => s.id === id);
+    return displayAction(button, () => api(`scenes/${encodeURIComponent(id)}/show`, { method: 'POST' }),
+        () => `Showing ${scene ? scene.name : id}`);
+}
+
+async function toggleScene(scene, button) {
+    const enabled = !scene.config.enabled;
+    button.setAttribute('aria-checked', String(enabled));
+    try {
+        await api(`scenes/${encodeURIComponent(scene.id)}`, { method: 'PATCH', json: { enabled } });
+        toast(`${scene.name} ${enabled ? 'added to' : 'removed from'} rotation`);
+        await refreshScenes();
+    } catch (err) {
+        button.setAttribute('aria-checked', String(!enabled));
+        toast(err.message, 'error');
+    }
+}
+
+function setEditingOrder(editing) {
+    state.editingOrder = editing;
+    $('#sceneList').classList.toggle('editing', editing);
+    const button = $('#orderBtn');
+    button.textContent = editing ? 'Done' : 'Edit order';
+    button.classList.toggle('btn-primary', editing);
+    button.classList.toggle('btn-tinted', !editing);
+    $('#orderCancel').hidden = !editing;
+    $('#orderHint').hidden = !editing;
+}
+
+async function saveOrder() {
+    const order = $$('#sceneList .scene-row').map((row) => row.dataset.id);
+    try {
+        await api('rotation/order', { method: 'PUT', json: order });
+        toast('Rotation order saved');
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+    setEditingOrder(false);
+    await refreshScenes().catch(() => {});
+    renderScenes(true);
+}
+
+function setupReorder() {
+    const list = $('#sceneList');
+
+    // Pointer drag (mouse, pen, touch). Listeners live on window, so moving
+    // the row in the DOM never interrupts the drag.
+    list.addEventListener('pointerdown', (event) => {
+        const handle = event.target.closest('.drag-handle');
+        if (!handle || !state.editingOrder) return;
+        event.preventDefault();
+        const row = handle.closest('.scene-row');
+        row.classList.add('dragging');
+
+        const onMove = (moveEvent) => {
+            const others = $$('.scene-row', list).filter((r) => r !== row);
+            const before = others.find((r) => {
+                const box = r.getBoundingClientRect();
+                return moveEvent.clientY < box.top + box.height / 2;
+            });
+            if (before) {
+                if (row.nextElementSibling !== before) list.insertBefore(row, before);
+            } else if (list.lastElementChild !== row) {
+                list.append(row);
             }
+        };
+        const onUp = () => {
+            row.classList.remove('dragging');
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointercancel', onUp);
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+    });
+
+    // Keyboard: focus a handle and use the arrow keys
+    list.addEventListener('keydown', (event) => {
+        const handle = event.target.closest('.drag-handle');
+        if (!handle || !state.editingOrder) return;
+        const row = handle.closest('.scene-row');
+        if (event.key === 'ArrowUp' && row.previousElementSibling) {
+            list.insertBefore(row, row.previousElementSibling);
+        } else if (event.key === 'ArrowDown' && row.nextElementSibling) {
+            list.insertBefore(row.nextElementSibling, row);
+        } else {
+            return;
         }
-        
-        // Show scene
-        async function showScene(sceneId) {
-            try {
-                await api(`scenes/${sceneId}/show`, { method: 'POST' });
-                currentSceneId = sceneId;
-                renderSceneList();
-                refreshPreview();
-                
-                const scene = scenes.find(s => s.id === sceneId);
-                document.getElementById('currentSceneName').textContent = 
-                    scene ? `${scene.icon} ${scene.name}` : '--';
-                
-                toast(`Showing ${scene?.name || sceneId}`);
-                log(`Displayed scene: ${scene?.name || sceneId}`);
-            } catch (e) {
-                toast(e.message, 'error');
-                log('Show scene failed: ' + e.message, 'error');
-            }
+        event.preventDefault();
+        handle.focus();
+    });
+}
+
+/* ====================================================================
+   Scene sheet
+   ==================================================================== */
+
+let sheet = null;  // { scene, form, initial }
+
+function sheetDirty() {
+    return Boolean(sheet) && JSON.stringify(sheet.form) !== sheet.initial;
+}
+
+function updateSheetButtons() {
+    const dirty = sheetDirty();
+    $('#sheetSave').disabled = !dirty;
+    const label = $('#sheetShowLabel');
+    if (label) label.textContent = dirty ? 'Save & show on display' : 'Show on display';
+}
+
+function positionText(scene) {
+    const enabled = (state.manager && state.manager.enabled_scenes) || [];
+    const index = enabled.indexOf(scene.id);
+    return index === -1 ? 'Not in rotation' : `${index + 1} of ${enabled.length}`;
+}
+
+function settingRow(setting, form) {
+    const key = setting.key;
+    const value = form.settings[key];
+    const set = (v) => { form.settings[key] = v; updateSheetButtons(); };
+
+    if (setting.type === 'checkbox') {
+        return h('div', { class: 'group-row' }, h('span', {}, setting.label), switchEl(Boolean(value), set, setting.label));
+    }
+    if (setting.type === 'select') {
+        return h('div', { class: 'group-row' }, h('span', {}, setting.label), segmented(setting.options, String(value), set, setting.label));
+    }
+
+    const id = `setting-${key}`;
+    const isNumber = setting.type === 'number';
+    const isSecret = setting.type === 'password';
+    const input = h('input', {
+        class: `input${isSecret ? ' mono' : ''}`, id,
+        type: isSecret ? 'password' : isNumber ? 'number' : 'text',
+        value: value === undefined || value === null ? '' : String(value),
+        placeholder: setting.default ? String(setting.default) : '',
+        min: setting.min, max: setting.max, autocomplete: 'off', spellcheck: 'false',
+        oninput: (event) => set(isNumber && event.target.value !== '' ? Number(event.target.value) : event.target.value),
+    });
+
+    let control = input;
+    if (isSecret) {
+        const reveal = h('button', {
+            class: 'btn btn-icon btn-sm input-addon', type: 'button', 'aria-label': 'Show value',
+            onclick: () => {
+                const show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                reveal.replaceChildren(icon(show ? 'eye-off' : 'eye'));
+                reveal.setAttribute('aria-label', show ? 'Hide value' : 'Show value');
+            },
+        }, icon('eye'));
+        control = h('div', { class: 'input-wrap' }, input, reveal);
+    }
+
+    return h('div', { class: 'group-row stack' },
+        h('label', { for: id }, setting.label),
+        control,
+        setting.description ? h('p', { class: 'help' }, setting.description) : null);
+}
+
+function detailRow(label, value) {
+    return h('div', { class: 'group-row' }, h('span', {}, label), h('span', { class: 'value' }, value));
+}
+
+function openScene(id) {
+    const scene = state.scenes.find((s) => s.id === id);
+    if (!scene) return;
+
+    const schema = scene.settings_schema || [];
+    const form = { enabled: scene.config.enabled, settings: {} };
+    for (const setting of schema) {
+        form.settings[setting.key] = scene.config.settings[setting.key] ?? setting.default ?? '';
+    }
+    sheet = { scene, form, initial: JSON.stringify(form) };
+
+    const curl = `curl -X POST ${location.origin}/api/scenes/${scene.id}/show`;
+    $('#sheetTitle').replaceChildren(sceneTile(scene, 'sm'), h('span', { id: 'sheetName' }, scene.name));
+    $('#sheetBody').replaceChildren(
+        h('div', { class: 'sheet-preview' },
+            h('div', { class: 'screen', id: 'sheetScreen' },
+                h('img', { id: 'sheetImg', alt: `${scene.name} preview`, hidden: true }),
+                h('div', { class: 'screen-busy' }, h('span', { class: 'spinner' }), h('span', {}, 'Rendering…'))),
+            h('div', { class: 'sheet-preview-bar' },
+                h('p', { class: 'help', id: 'sheetPreviewNote' }, 'Preview, not sent to the display'),
+                h('button', { class: 'btn btn-sm btn-plain', type: 'button', onclick: loadSheetPreview }, icon('refresh'), 'Re-render'))),
+
+        h('button', { class: 'btn btn-primary btn-lg btn-block sheet-show', type: 'button', onclick: (event) => sheetShow(event.currentTarget) },
+            icon('play'), h('span', { id: 'sheetShowLabel' }, 'Show on display')),
+
+        h('div', { class: 'group-title' }, 'Rotation'),
+        h('div', { class: 'group' },
+            h('div', { class: 'group-row' },
+                h('span', {}, 'Include in rotation'),
+                switchEl(form.enabled, (v) => { form.enabled = v; updateSheetButtons(); }, `Include ${scene.name} in rotation`)),
+            detailRow('Position', positionText(scene))),
+
+        schema.length ? h('div', { class: 'group-title' }, 'Settings') : null,
+        schema.length ? h('div', { class: 'group' }, schema.map((setting) => settingRow(setting, form))) : null,
+
+        h('div', { class: 'group-title' }, 'Details'),
+        h('div', { class: 'group' },
+            detailRow('Scene ID', h('code', {}, scene.id)),
+            detailRow('Last data', scene.last_data_at ? fmt.time(scene.last_data_at) : 'Not rendered yet'),
+            detailRow('Status', scene.last_error
+                ? h('span', { class: 'text-red' }, icon('warning'), 'Error')
+                : h('span', { class: 'text-green' }, icon('check'), 'OK')),
+            scene.last_error ? h('div', { class: 'group-row stack' }, h('pre', { class: 'error-block' }, scene.last_error)) : null,
+            h('div', { class: 'group-row stack' },
+                h('div', { class: 'row space' },
+                    h('span', {}, 'Show it from a script'),
+                    h('button', { class: 'btn btn-sm btn-plain', type: 'button', onclick: () => copyText(curl, 'curl command copied') }, icon('copy'), 'Copy')),
+                h('code', { class: 'code-block' }, curl))),
+    );
+
+    updateSheetButtons();
+    $('#sceneSheet').showModal();
+    $('#sheetBody').scrollTop = 0;
+    loadSheetPreview();
+}
+
+function loadSheetPreview() {
+    if (!sheet) return;
+    const id = sheet.scene.id;
+    const screen = $('#sheetScreen');
+    const note = $('#sheetPreviewNote');
+    screen.classList.add('is-busy');
+    const started = performance.now();
+    const probe = new Image();
+    probe.onload = () => {
+        if (!sheet || sheet.scene.id !== id) return;
+        const img = $('#sheetImg');
+        img.src = probe.src;
+        img.hidden = false;
+        screen.classList.remove('is-busy');
+        note.textContent = `Preview rendered in ${fmt.ms(performance.now() - started)}, not sent to the display`;
+    };
+    probe.onerror = () => {
+        screen.classList.remove('is-busy');
+        note.textContent = 'Preview failed to render';
+    };
+    // A fresh render: fetches live data from the scene's APIs
+    probe.src = `/api/scenes/${encodeURIComponent(id)}/preview?t=${Date.now()}`;
+}
+
+async function saveSheet(button) {
+    if (!sheetDirty()) return true;
+    const { scene, form } = sheet;
+    const settings = { ...form.settings };
+    for (const setting of scene.settings_schema || []) {
+        if (setting.type !== 'number' || settings[setting.key] === '') continue;
+        let n = Number(settings[setting.key]);
+        if (setting.min != null) n = Math.max(setting.min, n);
+        if (setting.max != null) n = Math.min(setting.max, n);
+        settings[setting.key] = n;
+    }
+    try {
+        await withLoading(button, () => api(`scenes/${encodeURIComponent(scene.id)}`, {
+            method: 'PATCH', json: { enabled: form.enabled, settings },
+        }));
+        sheet.initial = JSON.stringify(form);
+        updateSheetButtons();
+        toast(`${scene.name} saved`);
+        refreshScenes().catch(() => {});
+        return true;
+    } catch (err) {
+        toast(err.message, 'error');
+        return false;
+    }
+}
+
+async function sheetShow(button) {
+    if (!sheet) return;
+    const id = sheet.scene.id;
+    if (sheetDirty() && !(await saveSheet(button))) return;
+    closeSheet(true);
+    showScene(id, null);
+}
+
+async function closeSheet(force = false) {
+    if (!sheet) return;
+    if (!force && sheetDirty()) {
+        const discard = await confirmDialog({
+            title: 'Discard changes?',
+            message: `Your changes to ${sheet.scene.name} haven't been saved.`,
+            confirm: 'Discard',
+            destructive: true,
+        });
+        if (!discard) return;
+    }
+    sheet = null;
+    $('#sceneSheet').close();
+}
+
+/* ====================================================================
+   Notifications
+   ==================================================================== */
+
+async function refreshNotifications() {
+    const data = await api('notifications');
+    state.notifications = data.notifications || [];
+    state.unread = data.unread_count || 0;
+    renderNotifications();
+}
+
+function notificationsActive() {
+    const scene = state.scenes.find((s) => s.id === 'notifications');
+    return Boolean(scene && scene.config.enabled);
+}
+
+function renderNotifOff() {
+    const scene = state.scenes.find((s) => s.id === 'notifications');
+    $('#notifOff').hidden = !scene || scene.config.enabled;
+    renderNotifSub();
+}
+
+function renderNotifSub() {
+    const total = state.notifications.length;
+    let text = 'Push them here or from scripts via the API';
+    if (state.unread) {
+        text = notificationsActive()
+            ? `${state.unread} unread · shown instead of the other scenes until read`
+            : `${state.unread} unread`;
+    } else if (total) {
+        text = 'All read';
+    }
+    $('#notifSub').textContent = text;
+}
+
+function renderNotifications() {
+    renderNotifSub();
+    const list = [...state.notifications].sort((a, b) =>
+        (Number(a.read) - Number(b.read)) || String(b.timestamp).localeCompare(String(a.timestamp)));
+    $('#notifClear').hidden = !list.length;
+
+    const sig = JSON.stringify(list);
+    if (sig === state.notifSig) return;
+    state.notifSig = sig;
+
+    const el = $('#notifList');
+    if (!list.length) {
+        el.replaceChildren(h('div', { class: 'empty' }, h('div', {}, 'No notifications'), h('div', { class: 'mono' }, 'POST /api/notifications')));
+        return;
+    }
+    el.replaceChildren(...list.map((n) => h('div', { class: `notif${n.read ? ' read' : ''}` },
+        n.read ? null : h('span', { class: 'unread-dot', title: 'Unread' }),
+        h('div', { class: 'notif-body' },
+            h('div', { class: 'notif-top' },
+                h('span', { class: 'notif-title' }, n.title),
+                n.priority === 'high' ? h('span', { class: 'badge badge-red' }, icon('warning'), 'High') : null,
+                n.priority === 'low' ? h('span', { class: 'badge badge-gray' }, 'Low') : null,
+                h('span', { class: 'notif-time' }, fmt.shortTime(n.timestamp))),
+            h('div', { class: 'notif-msg' }, n.message)),
+        n.read ? null : h('button', {
+            class: 'btn btn-icon btn-sm', type: 'button', title: 'Mark as read', 'aria-label': `Mark “${n.title}” as read`,
+            onclick: (event) => markRead(n, event.currentTarget),
+        }, icon('check')))));
+}
+
+async function markRead(notification, button) {
+    try {
+        await withLoading(button, () => api(`notifications/${notification.id}/read`, { method: 'POST' }));
+        await Promise.all([refreshNotifications(), refreshScenes()]);
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+/* ====================================================================
+   Device
+   ==================================================================== */
+
+function deviceAddress() {
+    const { ip, port } = state.config;
+    return port && Number(port) !== 80 ? `${ip}:${port}` : ip;
+}
+
+async function refreshDevice() {
+    let data;
+    try {
+        data = await api('device/status');
+    } catch {
+        setServerDown(true);
+        return;
+    }
+    state.deviceCheckedAt = new Date();
+    if (data.status === 'online') {
+        if (state.deviceState === 'offline') log('ok', 'ESP32 is back online');
+        state.device = data.device;
+        state.deviceState = 'online';
+        state.deviceError = null;
+        state.deviceSyncedAt = performance.now();
+    } else {
+        if (state.deviceState === 'online') log('error', 'ESP32 went offline', data.error || '');
+        state.deviceState = 'offline';
+        state.deviceError = data.error || 'No response';
+    }
+    renderDevice();
+}
+
+async function loadDeviceConfig() {
+    try {
+        const config = await api('device/config');
+        state.config = config;
+        $('#deviceIp').value = config.ip;
+        $('#devicePort').value = config.port;
+        renderDevice();
+    } catch { /* offline: keep the template's address */ }
+}
+
+function setServerDown(down) {
+    if (state.serverDown === down) return;
+    state.serverDown = down;
+    log(down ? 'error' : 'ok', down ? 'Lost connection to the server' : 'Connected to the server');
+    renderDevice();
+}
+
+function signalQuality(rssi) {
+    if (rssi == null) return { bars: 0, label: 'Unknown', weak: false };
+    if (rssi >= -55) return { bars: 4, label: 'Excellent', weak: false };
+    if (rssi >= -67) return { bars: 3, label: 'Good', weak: false };
+    if (rssi >= -75) return { bars: 2, label: 'Fair', weak: false };
+    if (rssi >= -85) return { bars: 1, label: 'Weak', weak: true };
+    return { bars: 0, label: 'Very weak', weak: true };
+}
+
+function stat(label, value, note, extra) {
+    return h('div', { class: 'stat' },
+        h('div', { class: 'stat-label' }, label),
+        h('div', { class: 'stat-value' }, value),
+        note ? h('div', { class: 'stat-note' }, note) : null,
+        extra || null);
+}
+
+// Restarts that point to a problem (crash, watchdog, power dip)
+const BAD_RESETS = ['panic', 'interrupt watchdog', 'task watchdog', 'watchdog', 'brownout'];
+
+function renderStats(d) {
+    const el = $('#deviceStats');
+    if (!d) {
+        el.hidden = true;
+        return;
+    }
+    el.hidden = false;
+    const tiles = [];
+
+    const quality = signalQuality(d.rssi);
+    tiles.push(stat('Signal',
+        [h('span', {}, d.rssi ?? '—'), h('small', {}, 'dBm'),
+         h('span', { class: `bars${quality.weak ? ' weak' : ''}`, 'aria-hidden': 'true' },
+            [1, 2, 3, 4].map((i) => h('i', { class: i <= quality.bars ? 'on' : '' })))],
+        quality.weak ? h('span', { class: 'text-orange' }, icon('warning'), quality.label) : quality.label));
+
+    const reset = d.resetReason;
+    tiles.push(stat('Uptime',
+        h('span', { id: 'statUptime' }, d.uptimeSeconds != null ? fmt.duration(d.uptimeSeconds) : (d.uptime || '—')),
+        reset ? (BAD_RESETS.includes(reset)
+            ? h('span', { class: 'text-orange', title: 'Reason for the last restart' }, icon('warning'), `after ${reset}`)
+            : h('span', { title: 'Reason for the last restart' }, `after ${reset}`))
+            : 'since boot'));
+
+    if (d.freeHeap != null) {
+        const total = d.heapSize;
+        const used = total ? (total - d.freeHeap) / total : null;
+        const level = d.freeHeap < 20 * 1024 ? 'crit' : d.freeHeap < 40 * 1024 ? 'warn' : '';
+        const note = total
+            ? `of ${fmt.kb(total)} KB${d.minFreeHeap != null ? ` · low ${fmt.kb(d.minFreeHeap)}` : ''}`
+            : 'heap';
+        tiles.push(stat('Free memory', [h('span', {}, fmt.kb(d.freeHeap)), h('small', {}, 'KB')], note,
+            used == null ? null : h('div', {
+                class: `meter ${level}`, role: 'meter', 'aria-label': 'Memory in use',
+                'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(used * 100)),
+            }, h('span', { style: `width: ${Math.round(used * 100)}%` }))));
+    }
+
+    tiles.push(stat('Requests', h('span', {}, fmt.number(d.requests ?? 0)), 'since boot'));
+
+    const panel = d.display || {};
+    tiles.push(stat('Panel', h('span', {}, `${panel.width ?? 250} × ${panel.height ?? 122}`),
+        `1-bit · ${fmt.number(panel.bufferSize ?? 4000)} B`));
+
+    // The ESP32 answers once the panel has refreshed, so this is the real refresh time
+    const refreshMs = state.display && state.display.refresh_ms;
+    tiles.push(stat('Last refresh',
+        refreshMs != null ? [h('span', {}, (refreshMs / 1000).toFixed(2)), h('small', {}, 's')] : h('span', {}, '—'),
+        refreshMs != null ? 'HTTP round trip' : 'no frame sent yet'));
+
+    el.replaceChildren(...tiles);
+}
+
+function renderInfo(d) {
+    const rows = [];
+    const add = (key, value) => {
+        if (value !== undefined && value !== null && value !== '') rows.push(h('dt', {}, key), h('dd', {}, value));
+    };
+    if (d) {
+        add('IP address', d.ip);
+        add('Hostname', d.hostname ? `${d.hostname}.local` : null);
+        add('WiFi', d.ssid);
+        add('MAC', d.mac);
+        add('Chip', d.chip);
+        add('ESP-IDF', d.sdk);
+        if (d.chip == null) add('Firmware', 'flash the latest for more details');
+    }
+    $('#deviceInfo').replaceChildren(...rows);
+}
+
+function renderDevice() {
+    const online = state.deviceState === 'online';
+    const offline = state.deviceState === 'offline';
+    const d = online ? state.device : null;
+    const address = deviceAddress();
+
+    const pill = $('#statusPill');
+    pill.dataset.state = state.serverDown || offline ? 'offline' : state.deviceState;
+    $('#statusText').textContent = state.serverDown ? 'Server unreachable' : online ? 'Online' : offline ? 'Offline' : 'Checking…';
+    $('#statusMeta').textContent = state.serverDown ? '' : online && d.rssi != null ? `${address} · ${d.rssi} dBm` : address;
+    $('#deviceLed').dataset.state = online ? 'online' : offline ? 'offline' : '';
+
+    const badge = $('#deviceBadge');
+    badge.className = `badge ${online ? 'badge-green' : offline ? 'badge-red' : 'badge-gray'}`;
+    badge.replaceChildren(online ? icon('check') : offline ? icon('xmark') : '', online ? 'Online' : offline ? 'Offline' : 'Checking…');
+
+    $('#deviceOffline').hidden = !offline;
+    $('#deviceOfflineText').textContent = `Can't reach ${address}. Check that the ESP32 is powered and on WiFi, or fix the address below.`;
+    $('#deviceOfflineError').textContent = state.deviceError || '';
+
+    renderStats(d);
+    renderInfo(d);
+    $('#deviceLink').href = `http://${address}/`;
+    $('#deviceChecked').textContent = state.deviceCheckedAt
+        ? `Checked ${state.deviceCheckedAt.toLocaleTimeString('en-GB', { hour12: false })}.`
+        : '';
+}
+
+/* ====================================================================
+   Wiring
+   ==================================================================== */
+
+function setupHero() {
+    $('#prevBtn').addEventListener('click', (e) => stepScene('prev', e.currentTarget));
+    $('#nextBtn').addEventListener('click', (e) => stepScene('next', e.currentTarget));
+    $('#refreshBtn').addEventListener('click', (e) => refreshDisplay(e.currentTarget));
+
+    $('#rotationSwitch').addEventListener('click', async (event) => {
+        if (!state.manager) return;
+        const on = !state.manager.rotation_enabled;
+        const control = event.currentTarget;
+        control.setAttribute('aria-checked', String(on));
+        try {
+            await api(`rotation/${on ? 'start' : 'stop'}`, { method: 'POST' });
+            toast(on ? 'Auto-rotate on' : 'Auto-rotate off');
+            await refreshScenes();
+        } catch (err) {
+            control.setAttribute('aria-checked', String(!on));
+            toast(err.message, 'error');
         }
-        
-        // Rotation
-        async function toggleRotation() {
-            const toggle = document.getElementById('rotationToggle');
-            const isActive = toggle.classList.contains('active');
-            
-            try {
-                if (isActive) {
-                    await api('rotation/stop', { method: 'POST' });
-                    toggle.classList.remove('active');
-                    document.getElementById('rotationStatus').textContent = 'Paused';
-                    log('Rotation stopped');
-                } else {
-                    await api('rotation/start', { method: 'POST' });
-                    toggle.classList.add('active');
-                    const interval = document.getElementById('intervalInput').value;
-                    document.getElementById('rotationStatus').textContent = `Every ${interval}s`;
-                    log('Rotation started');
-                }
-            } catch (e) {
-                toast(e.message, 'error');
-            }
+    });
+
+    const seg = $('#intervalSeg');
+    seg.replaceChildren(...[...INTERVAL_PRESETS.map((s) => [String(s), s < 60 ? `${s}s` : `${s / 60}m`]), ['custom', 'Custom']]
+        .map(([value, label]) => h('button', { type: 'button', role: 'radio', 'aria-checked': 'false', dataset: { value } }, label)));
+    bindSegmented(seg, (value) => {
+        const custom = $('#intervalCustom');
+        if (value === 'custom') {
+            state.customInterval = true;
+            custom.hidden = false;
+            custom.focus();
+            custom.select();
+        } else {
+            state.customInterval = false;
+            setRotationInterval(value);
         }
-        
-        async function updateInterval() {
-            const interval = parseInt(document.getElementById('intervalInput').value);
-            try {
-                await api(`rotation/interval?interval=${interval}`, { method: 'POST' });
-                document.getElementById('rotationStatus').textContent = `Every ${interval}s`;
-                log(`Rotation interval set to ${interval}s`);
-            } catch (e) {
-                toast(e.message, 'error');
-            }
+    });
+    $('#intervalCustom').addEventListener('change', (event) => setRotationInterval(event.target.value));
+}
+
+function setupScenes() {
+    $('#orderBtn').addEventListener('click', () => (state.editingOrder ? saveOrder() : setEditingOrder(true)));
+    $('#orderCancel').addEventListener('click', () => {
+        setEditingOrder(false);
+        renderScenes(true);
+    });
+    setupReorder();
+
+    const dialog = $('#sceneSheet');
+    $('#sheetCancel').addEventListener('click', () => closeSheet());
+    $('#sheetSave').addEventListener('click', async (event) => {
+        if (await saveSheet(event.currentTarget)) closeSheet(true);
+    });
+    dialog.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        closeSheet();
+    });
+    dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) closeSheet();  // backdrop
+    });
+}
+
+function setupSend() {
+    bindSegmented($('#sendSeg'), (value) => {
+        for (const panel of $$('.send-panel')) panel.hidden = panel.dataset.panel !== value;
+    });
+
+    $('#msgText').addEventListener('input', (event) => {
+        const n = event.target.value.length;
+        $('#msgHelp').textContent = n ? `${n} characters · wraps to 5 lines` : 'Wraps to 5 lines under the title bar';
+    });
+    $('#sendMessage').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const title = $('#msgTitle').value.trim() || 'Message';
+        const text = $('#msgText').value.trim();
+        if (!text) {
+            toast('Write a message first', 'error');
+            $('#msgText').focus();
+            return;
         }
-        
-        async function nextScene() {
-            try {
-                const data = await api('rotation/next', { method: 'POST' });
-                currentSceneId = data.scene;
-                await loadScenes();
-                refreshPreview();
-                log('Next scene: ' + data.scene);
-            } catch (e) {
-                toast(e.message, 'error');
-            }
+        const form = new FormData();
+        form.append('title', title);
+        form.append('text', text);
+        displayAction(event.submitter, () => api('display/text', { method: 'POST', form }), () => 'Message sent');
+    });
+
+    // Image: file picker or drag & drop
+    const input = $('#imageFile');
+    const drop = $('#dropzone');
+    drop.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => pickImage(input.files[0]));
+    for (const type of ['dragenter', 'dragover']) {
+        drop.addEventListener(type, (event) => { event.preventDefault(); drop.classList.add('over'); });
+    }
+    for (const type of ['dragleave', 'drop']) {
+        drop.addEventListener(type, (event) => { event.preventDefault(); drop.classList.remove('over'); });
+    }
+    drop.addEventListener('drop', (event) => pickImage(event.dataTransfer.files[0]));
+    $('#imageRemove').addEventListener('click', clearImage);
+    $('#sendImage').addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (!state.imageFile) return;
+        const form = new FormData();
+        form.append('file', state.imageFile);
+        displayAction(event.submitter, () => api('display/image', { method: 'POST', form }), () => 'Image sent');
+    });
+
+    bindSegmented($('#blankSeg'), (value) => { state.blankWhite = value === 'white'; });
+    $('#sendBlank').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const white = state.blankWhite;
+        displayAction(event.submitter, () => api(`display/clear?white=${white}`, { method: 'POST' }),
+            () => `Display cleared to ${white ? 'white' : 'black'}`);
+    });
+}
+
+function pickImage(file) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+        toast('That file is not an image', 'error');
+        return;
+    }
+    state.imageFile = file;
+    if (state.imageUrl) URL.revokeObjectURL(state.imageUrl);
+    state.imageUrl = URL.createObjectURL(file);
+
+    const preview = $('#imagePreview');
+    const kind = (file.type.split('/')[1] || '').toUpperCase();
+    const size = file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} KB` : `${(file.size / 1048576).toFixed(1)} MB`;
+    $('#imageMeta').textContent = `${kind} · ${size}`;
+    preview.onload = () => {
+        $('#imageMeta').textContent = `${preview.naturalWidth} × ${preview.naturalHeight} px · ${kind} · ${size}`;
+    };
+    preview.src = state.imageUrl;
+    $('#imageName').textContent = file.name;
+    $('#imagePicked').hidden = false;
+    $('#dropzone').hidden = true;
+    $('#imageSend').disabled = false;
+}
+
+function clearImage() {
+    state.imageFile = null;
+    $('#imageFile').value = '';
+    $('#imagePicked').hidden = true;
+    $('#dropzone').hidden = false;
+    $('#imageSend').disabled = true;
+}
+
+function setupNotifications() {
+    bindSegmented($('#notifPriority'), (value) => { state.priority = value; });
+
+    $('#notifForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const title = $('#notifTitleInput').value.trim();
+        const message = $('#notifMessage').value.trim();
+        if (!title || !message) return;
+        try {
+            await withLoading(event.submitter, () => api('notifications', {
+                method: 'POST', json: { title, message, priority: state.priority },
+            }));
+            event.target.reset();
+            state.priority = 'normal';
+            selectSegment($('#notifPriority'), 'normal');
+            toast('Notification added');
+            await Promise.all([refreshNotifications(), refreshScenes()]);
+        } catch (err) {
+            toast(err.message, 'error');
         }
-        
-        async function prevScene() {
-            try {
-                const data = await api('rotation/prev', { method: 'POST' });
-                currentSceneId = data.scene;
-                await loadScenes();
-                refreshPreview();
-                log('Previous scene: ' + data.scene);
-            } catch (e) {
-                toast(e.message, 'error');
-            }
+    });
+
+    $('#notifClear').addEventListener('click', async (event) => {
+        const ok = await confirmDialog({
+            title: 'Clear all notifications?',
+            message: `${state.notifications.length} notification${state.notifications.length === 1 ? '' : 's'} will be removed.`,
+            confirm: 'Clear all',
+            destructive: true,
+        });
+        if (!ok) return;
+        try {
+            await withLoading(event.currentTarget, () => api('notifications', { method: 'DELETE' }));
+            toast('Notifications cleared');
+            await Promise.all([refreshNotifications(), refreshScenes()]);
+        } catch (err) {
+            toast(err.message, 'error');
         }
-        
-        async function refreshDisplay() {
-            try {
-                await api('display/refresh', { method: 'POST' });
-                refreshPreview();
-                toast('Display refreshed');
-                log('Display refreshed');
-            } catch (e) {
-                toast(e.message, 'error');
-                log('Refresh failed: ' + e.message, 'error');
-            }
+    });
+
+    $('#notifEnable').addEventListener('click', async (event) => {
+        try {
+            await withLoading(event.currentTarget, () => api('scenes/notifications', { method: 'PATCH', json: { enabled: true } }));
+            toast('Notifications scene turned on');
+            await refreshScenes();
+        } catch (err) {
+            toast(err.message, 'error');
         }
-        
-        // Settings Modal
-        function openSettings(sceneId) {
-            editingSceneId = sceneId;
-            const scene = scenes.find(s => s.id === sceneId);
-            if (!scene) return;
-            
-            document.getElementById('modalIcon').textContent = scene.icon;
-            document.getElementById('modalTitle').textContent = scene.name + ' Settings';
-            
-            // Generate settings form
-            let html = `
-                <div class="form-group">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="setting-enabled" ${scene.config.enabled ? 'checked' : ''}>
-                        <label for="setting-enabled" style="margin: 0;">Enabled in rotation</label>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Update Interval (seconds)</label>
-                    <input type="number" id="setting-interval" value="${scene.config.interval}" min="10" max="3600">
-                </div>
-            `;
-            
-            // Add scene-specific settings
-            if (scene.settings_schema && scene.settings_schema.length > 0) {
-                html += '<hr style="border: none; border-top: 1px solid var(--border); margin: 1rem 0;">';
-                html += '<div style="font-weight: 500; margin-bottom: 1rem;">Scene Settings</div>';
-                
-                for (const setting of scene.settings_schema) {
-                    const value = scene.config.settings[setting.key] ?? setting.default;
-                    
-                    if (setting.type === 'checkbox') {
-                        html += `
-                            <div class="form-group">
-                                <div class="checkbox-group">
-                                    <input type="checkbox" id="custom-${setting.key}" ${value ? 'checked' : ''}>
-                                    <label for="custom-${setting.key}" style="margin: 0;">${setting.label}</label>
-                                </div>
-                            </div>
-                        `;
-                    } else if (setting.type === 'select') {
-                        html += `
-                            <div class="form-group">
-                                <label>${setting.label}</label>
-                                <select id="custom-${setting.key}">
-                                    ${setting.options.map(opt => 
-                                        `<option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>`
-                                    ).join('')}
-                                </select>
-                            </div>
-                        `;
-                    } else if (setting.type === 'password') {
-                        html += `
-                            <div class="form-group">
-                                <label>${setting.label}</label>
-                                <input type="password" id="custom-${setting.key}" value="${value || ''}" placeholder="${setting.description || ''}">
-                            </div>
-                        `;
-                    } else {
-                        html += `
-                            <div class="form-group">
-                                <label>${setting.label}</label>
-                                <input type="${setting.type === 'number' ? 'number' : 'text'}" 
-                                       id="custom-${setting.key}" 
-                                       value="${value || ''}"
-                                       placeholder="${setting.description || ''}">
-                            </div>
-                        `;
-                    }
-                }
-            }
-            
-            document.getElementById('modalBody').innerHTML = html;
-            document.getElementById('settingsModal').classList.add('open');
+    });
+}
+
+function setupDevice() {
+    $('#statusPill').addEventListener('click', () => {
+        $('#deviceCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    $('#deviceForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const ip = $('#deviceIp').value.trim();
+        const port = Number($('#devicePort').value) || 80;
+        if (!ip) return;
+        try {
+            await withLoading(event.submitter, async () => {
+                await api('device/config', { method: 'POST', json: { ip, port } });
+                state.config = { ip, port };
+                state.deviceState = 'checking';
+                renderDevice();
+                await refreshDevice();
+            });
+            if (state.deviceState === 'online') toast(`Connected to ${deviceAddress()}`);
+            else toast(`Saved, but ${deviceAddress()} isn't responding`, 'error');
+        } catch (err) {
+            toast(err.message, 'error');
         }
-        
-        function closeModal() {
-            document.getElementById('settingsModal').classList.remove('open');
-            editingSceneId = null;
-        }
-        
-        async function saveSceneSettings() {
-            if (!editingSceneId) return;
-            
-            const scene = scenes.find(s => s.id === editingSceneId);
-            const config = {
-                enabled: document.getElementById('setting-enabled').checked,
-                interval: parseInt(document.getElementById('setting-interval').value),
-                settings: {}
-            };
-            
-            // Collect custom settings
-            if (scene.settings_schema) {
-                for (const setting of scene.settings_schema) {
-                    const el = document.getElementById('custom-' + setting.key);
-                    if (el) {
-                        if (setting.type === 'checkbox') {
-                            config.settings[setting.key] = el.checked;
-                        } else if (setting.type === 'number') {
-                            config.settings[setting.key] = parseInt(el.value);
-                        } else {
-                            config.settings[setting.key] = el.value;
-                        }
-                    }
-                }
-            }
-            
-            try {
-                await api(`scenes/${editingSceneId}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config)
-                });
-                
-                toast('Settings saved');
-                log(`Updated ${scene.name} settings`);
-                closeModal();
-                await loadScenes();
-            } catch (e) {
-                toast(e.message, 'error');
-            }
-        }
-        
-        // Notifications
-        async function sendNotification() {
-            const title = document.getElementById('notifTitle').value;
-            const message = document.getElementById('notifMessage').value;
-            const priority = document.getElementById('notifPriority').value;
-            
-            if (!title || !message) {
-                toast('Please fill in title and message', 'error');
-                return;
-            }
-            
-            try {
-                await api('notifications', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, message, priority })
-                });
-                
-                document.getElementById('notifTitle').value = '';
-                document.getElementById('notifMessage').value = '';
-                
-                toast('Notification added');
-                log(`Notification: ${title}`);
-            } catch (e) {
-                toast(e.message, 'error');
-            }
-        }
-        
-        async function clearNotifications() {
-            try {
-                await api('notifications', { method: 'DELETE' });
-                toast('Notifications cleared');
-                log('Cleared all notifications');
-            } catch (e) {
-                toast(e.message, 'error');
-            }
-        }
-        
-        // Device
-        async function checkDeviceStatus() {
-            try {
-                const data = await api('device/status');
-                const dot = document.getElementById('statusDot');
-                const text = document.getElementById('statusText');
-                
-                if (data.status === 'online') {
-                    dot.className = 'status-dot online';
-                    text.textContent = 'Online';
-                    
-                    const device = data.device;
-                    document.getElementById('infoIp').textContent = device.ip || '-';
-                    document.getElementById('infoRssi').textContent = (device.rssi || '-') + ' dBm';
-                    document.getElementById('infoUptime').textContent = device.uptime || '-';
-                    document.getElementById('infoRam').textContent = ((device.freeHeap || 0) / 1024).toFixed(1) + ' KB';
-                } else {
-                    throw new Error(data.error);
-                }
-            } catch (e) {
-                document.getElementById('statusDot').className = 'status-dot offline';
-                document.getElementById('statusText').textContent = 'Offline';
-            }
-        }
-        
-        async function saveDeviceConfig() {
-            const ip = document.getElementById('deviceIp').value;
-            try {
-                await api('device/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ip })
-                });
-                toast('Device config saved');
-                log('Device IP: ' + ip);
-                checkDeviceStatus();
-            } catch (e) {
-                toast(e.message, 'error');
-            }
-        }
-        
-        // Initialize
-        async function init() {
-            await loadScenes();
-            await checkDeviceStatus();
-            refreshPreview();
-            
-            // Periodic updates
-            setInterval(checkDeviceStatus, 10000);
-            setInterval(loadScenes, 30000);
-            setInterval(refreshPreview, 60000);
-        }
-        
-        init();
-    </script>
+    });
+
+    $('#logClear').addEventListener('click', () => {
+        logEntries.length = 0;
+        renderLog();
+    });
+}
+
+function setupShortcuts() {
+    document.addEventListener('keydown', (event) => {
+        if (event.defaultPrevented || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+        if ($('dialog[open]')) return;
+        if (event.target.closest('input, textarea, select, [contenteditable], [role="radiogroup"], .scene-list.editing')) return;
+        // Same as clicking the button; ignored while that button's action runs
+        const button = { ArrowLeft: '#prevBtn', ArrowRight: '#nextBtn', r: '#refreshBtn', R: '#refreshBtn' }[event.key];
+        if (!button) return;
+        event.preventDefault();
+        if (!$(button).disabled) $(button).click();
+    });
+}
+
+async function init() {
+    hydrateIcons();
+    setupHero();
+    setupScenes();
+    setupSend();
+    setupNotifications();
+    setupDevice();
+    setupShortcuts();
+    renderLog();
+    $('#deviceIp').value = state.config.ip;
+    renderDevice();
+
+    await Promise.allSettled([refreshScenes(), refreshNotifications(), loadDeviceConfig()]);
+    renderNotifications();
+    refreshDevice();
+
+    // Polling pauses while the tab is hidden
+    const poll = (fn, ms) => setInterval(() => { if (!document.hidden) fn(); }, ms);
+    poll(() => refreshScenes().catch(() => {}), 4000);
+    poll(() => refreshNotifications().catch(() => {}), 8000);
+    poll(refreshDevice, 10000);
+    setInterval(tick, 250);
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        refreshScenes().catch(() => {});
+        refreshNotifications().catch(() => {});
+        refreshDevice();
+    });
+}
+
+init();
+</script>
+{% endraw %}
 </body>
 </html>
