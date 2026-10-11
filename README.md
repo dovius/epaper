@@ -1,43 +1,56 @@
-# Ultimate E-Paper Dashboard
+# E-Paper Dashboard
 
-This project transforms your ESP32 + 2.13" E-Paper display into a smart dashboard that displays:
-- **Real-time Clock** (NTP synced)
-- **Local Weather** (Temperature & Condition via Open-Meteo)
-- **Hacker News Top Stories**
-- **WiFi Signal Status**
+ESP32 + Waveshare 2.13" e-paper display for the homelab. The ESP32 is a "dumb"
+display with an HTTP API; everything you see is rendered by a Python server
+(Docker on the NAS) and pushed to it as a ready-made 1-bit image:
 
-## Features
-- **Deep Sleep**: The device sleeps between updates (every 10 minutes) to save battery.
-- **Robust Parsing**: Uses `ArduinoJson` for reliable API handling.
-- **Custom Graphics**: Includes custom icons for Weather and WiFi.
-- **Fast Refresh**: Optimized display updates.
+- **Stocks** with mini charts (Finnhub + Yahoo)
+- **Bitcoin** price in EUR with a 7-day chart (CoinGecko)
+- **Weather** forecast for 3 days (Open-Meteo)
+- **OctoPrint** printer status
+- **Notifications** pushed over the API
+- **System** clock and uptime
 
-## Configuration
-Open `src/main.cpp` and update the following:
+```
+┌─────────────────┐   POST /api/display/raw   ┌──────────────┐
+│  Python server  │ ────────────────────────▶ │    ESP32     │
+│  (FastAPI)      │   4000 byte 1-bit frame   │  (e-paper)   │
+└────────┬────────┘                           └──────────────┘
+         │ :8000
+   web dashboard / scripts
+```
 
-1. **WiFi Credentials**:
-   ```cpp
-   const char* WIFI_SSID = "YOUR_WIFI_SSID";
-   const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
-   ```
+Setting it up on a new machine (Docker server + flashing the ESP32): see
+**[DEPLOY.md](DEPLOY.md)**.
 
-2. **Location (for Weather)**:
-   Get your Latitude/Longitude from Google Maps or similar.
-   ```cpp
-   const float LATITUDE = 37.7749;
-   const float LONGITUDE = -122.4194;
-   ```
+## Firmware (ESP32)
 
-3. **Timezone**:
-   Adjust `UTC_OFFSET_SEC` (e.g., -28800 for PST).
+Built with PlatformIO.
 
-## Dependencies
-This project uses PlatformIO. Dependencies are automatically installed:
-- `ArduinoJson`
-- `NTPClient`
+1. Copy `src/config/Secrets.h.example` to `src/config/Secrets.h` and fill in
+   your WiFi credentials (the file is gitignored).
+2. Build and flash: `pio run -t upload`, serial monitor: `pio device monitor`.
+
+After boot the display shows its IP address. The device is also reachable as
+`http://epaper.local/` (mDNS, hostname from `Secrets.h`) and has a small web UI
+of its own.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/status` | GET | Device status (JSON) |
+| `/api/display/raw` | POST | Show a raw 1-bit frame (4000 bytes, 122x250, MSB first, 1 = white) |
+| `/api/display/clear` | POST | Clear display (`color=black` form field for black) |
+| `/api/display/text` | POST | Draw ASCII text, JSON `{"text", "x", "y", "fontSize"}` |
+| `/api/display/refresh` | POST | Redraw the buffer, `mode=full\|fast\|partial` |
+
+`tools/epaper_client.py` talks to these endpoints directly (useful for testing
+without the server).
+
+## Server
+
+See [server/README.md](server/README.md).
 
 ## Hardware
-- ESP32 Board (e.g., ESP-WROVER-KIT or generic ESP32)
-- Waveshare 2.13" E-Paper Display V4
 
-
+- ESP32 board (ESP-WROVER-KIT or generic ESP32)
+- Waveshare 2.13" e-paper display V4, wired as in `src/config/Config.h`
