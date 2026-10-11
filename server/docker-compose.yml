@@ -1,0 +1,25 @@
+services:
+  epaper-server:
+    build: .
+    container_name: epaper-server
+    # Use host network on Linux for direct LAN access
+    # On macOS, use bridged Colima (see README)
+    network_mode: ${DOCKER_NETWORK_MODE:-bridge}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist scene configuration (API keys etc.). Mount a directory, not
+      # the file itself: Docker would create a directory if the file is missing.
+      - ./data:/app/data
+    environment:
+      # ESP32 display IP
+      - ESP32_IP=${ESP32_IP:-192.168.1.231}
+      - SCENE_CONFIG=/app/data/scene_config.json
+      # Local time for the clock and timestamps (containers default to UTC)
+      - TZ=${TZ:-Europe/Vilnius}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/api/device/config').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

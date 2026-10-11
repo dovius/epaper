@@ -56,7 +56,7 @@ class StocksScene(Scene):
                                     'price': quote.get('c', 0),
                                     'change_pct': quote.get('dp', 0),
                                 }
-                        except:
+                        except Exception:
                             pass
                     
                     # Delay between Yahoo requests
@@ -75,7 +75,7 @@ class StocksScene(Scene):
                             quotes = result.get('indicators', {}).get('quote', [{}])[0]
                             closes = quotes.get('close', [])
                             history = [p for p in closes if p is not None]
-                    except:
+                    except Exception:
                         pass
                     
                     stocks[symbol] = {**price_data, 'history': history}

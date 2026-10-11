@@ -2,10 +2,14 @@
 Base Scene class and configuration
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Optional
 from PIL import Image
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -49,6 +53,7 @@ class Scene(ABC):
     def __init__(self, config: Optional[SceneConfig] = None):
         self.config = config or SceneConfig()
         self._last_data: Optional[dict] = None
+        self._last_data_at: Optional[datetime] = None
         self._last_error: Optional[str] = None
     
     @abstractmethod
@@ -65,13 +70,33 @@ class Scene(ABC):
         """Fetch data and render the scene"""
         try:
             data = await self.fetch_data()
+            img = self.render(data, generator)
             self._last_data = data
+            self._last_data_at = datetime.now()
             self._last_error = None
-            return self.render(data, generator)
+            return img
         except Exception as e:
             self._last_error = str(e)
+            # APIs fail now and then (e.g. a 503 for a few seconds): keep
+            # showing the last good data instead of an error screen. The
+            # error still shows up in the web UI via last_error.
+            if self._last_data is not None:
+                logger.warning(f"{self.name}: {e}, showing last good data")
+                try:
+                    return self.render(self._last_data, generator)
+                except Exception:
+                    pass
             # Render error state
             return self._render_error(generator, str(e))
+    
+    async def render_cached(self, generator: Any) -> Image.Image:
+        """Render the last fetched data again (cheap thumbnails), fetch if none yet"""
+        if self._last_data is not None:
+            try:
+                return self.render(self._last_data, generator)
+            except Exception:
+                pass
+        return await self.generate(generator)
     
     def _render_error(self, generator: Any, error: str) -> Image.Image:
         """Render error state"""
@@ -111,5 +136,6 @@ class Scene(ABC):
             'config': self.config.to_dict(),
             'settings_schema': self.settings_schema,
             'last_error': self._last_error,
+            'last_data_at': self._last_data_at.isoformat(timespec='seconds') if self._last_data_at else None,
         }
 

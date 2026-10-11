@@ -11,6 +11,8 @@ import asyncio
 import io
 import json
 import logging
+import os
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -22,7 +24,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from scene_manager import SceneManager
 from scenes import NotificationsScene, SystemScene
@@ -38,8 +40,10 @@ DISPLAY_WIDTH = 122
 DISPLAY_HEIGHT = 250
 FRAME_BUFFER_SIZE = ((DISPLAY_WIDTH + 7) // 8) * DISPLAY_HEIGHT
 
-ESP32_DEFAULT_IP = "192.168.1.231"
+ESP32_DEFAULT_IP = os.environ.get("ESP32_IP", "192.168.1.231")
 TIMEOUT = 30
+
+FONTS_DIR = Path(__file__).parent / "fonts"
 
 
 # ============================================================================
@@ -77,52 +81,44 @@ class ImageGenerator:
         self._load_fonts()
     
     def _load_fonts(self):
-        """Load IBM Plex fonts with fallbacks"""
+        """Load bundled IBM Plex fonts (fonts/), falling back to system fonts"""
         self.fonts = {'bold': {}, 'medium': {}, 'mono': {}}
         
-        # Font paths by style
+        # Font paths by style. The bundled fonts come first so rendering is
+        # identical everywhere, including the Docker image (which has no fonts).
         font_paths = {
             'bold': [
-                "/System/Library/Fonts/Supplemental/IBMPlexSans-Bold.otf",
-                "/usr/share/fonts/opentype/ibm-plex/IBMPlexSans-Bold.otf",
-                "C:/Windows/Fonts/IBMPlexSans-Bold.otf",
-                "/System/Library/Fonts/Helvetica.ttc",
+                FONTS_DIR / "IBMPlexSans-Bold.otf",
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/System/Library/Fonts/Helvetica.ttc",
             ],
             'medium': [
-                "/System/Library/Fonts/Supplemental/IBMPlexSans-Medium.otf",
-                "/usr/share/fonts/opentype/ibm-plex/IBMPlexSans-Medium.otf",
-                "C:/Windows/Fonts/IBMPlexSans-Medium.otf",
-                "/System/Library/Fonts/Helvetica.ttc",
+                FONTS_DIR / "IBMPlexSans-Medium.otf",
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/System/Library/Fonts/Helvetica.ttc",
             ],
             'mono': [
-                "/System/Library/Fonts/Supplemental/IBMPlexMono-Bold.otf",
-                "/usr/share/fonts/opentype/ibm-plex/IBMPlexMono-Bold.otf",
-                "C:/Windows/Fonts/IBMPlexMono-Bold.otf",
-                "/System/Library/Fonts/Menlo.ttc",
+                FONTS_DIR / "IBMPlexMono-Bold.otf",
                 "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+                "/System/Library/Fonts/Menlo.ttc",
             ],
         }
         
         sizes = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 42, 48]
         
         for style, paths in font_paths.items():
+            path = next((p for p in paths if Path(p).is_file()), None)
+            if path:
+                logger.info(f"Font '{style}': {path}")
+            else:
+                logger.warning(f"No font found for '{style}', using Pillow default")
+            
             for size in sizes:
-                font = None
-                for path in paths:
-                    try:
-                        font = ImageFont.truetype(path, size)
-                        break
-                    except:
-                        continue
-                
-                if font is None:
-                    font = ImageFont.load_default()
-                
+                if path:
+                    font = ImageFont.truetype(str(path), size)
+                else:
+                    font = ImageFont.load_default(size)
                 self.fonts[style][size] = font
-        
-        logger.info("Loaded IBM Plex fonts: Sans Bold, Sans Medium, Mono Bold")
     
     def get_font(self, size: int, style: str = "medium") -> ImageFont.FreeTypeFont:
         """Get font by size and style (bold, medium, mono)"""
@@ -199,28 +195,19 @@ class ImageGenerator:
         
         return img
     
-    def to_raw_bytes(self, img: Image.Image) -> bytes:
-        """Convert image to raw bytes for e-paper (with threshold for clean edges)"""
-        # Convert grayscale to 1-bit with threshold for cleaner text edges
-        if img.mode == 'L':
-            img = img.point(lambda x: 255 if x > 128 else 0, '1')
-        elif img.mode != '1':
+    def to_1bit(self, img: Image.Image) -> Image.Image:
+        """Convert to pure black/white exactly as the panel shows it"""
+        # Threshold instead of dithering for cleaner text edges
+        if img.mode != '1':
             img = img.convert('L').point(lambda x: 255 if x > 128 else 0, '1')
-        
-        img = img.rotate(-90, expand=True)
-        
-        raw = bytearray(FRAME_BUFFER_SIZE)
-        pixels = img.load()
-        
-        for y in range(DISPLAY_HEIGHT):
-            for x in range(DISPLAY_WIDTH):
-                byte_idx = (x // 8) + y * ((DISPLAY_WIDTH + 7) // 8)
-                bit_idx = 7 - (x % 8)
-                
-                if pixels[x, y]:
-                    raw[byte_idx] |= (1 << bit_idx)
-        
-        return bytes(raw)
+        return img
+    
+    def to_raw_bytes(self, img: Image.Image) -> bytes:
+        """Convert image to the e-paper frame buffer format"""
+        img = self.to_1bit(img).rotate(-90, expand=True)
+        # Mode '1' packs each row MSB-first, padded to whole bytes, 1 = white:
+        # the same layout as the ESP32 frame buffer
+        return img.tobytes()
 
 
 # ============================================================================
@@ -232,35 +219,73 @@ device_config = DeviceConfig()
 scene_manager: Optional[SceneManager] = None
 last_image: Optional[bytes] = None
 last_update: Optional[datetime] = None
+# What the last image shows: {"kind": "scene"|"message"|"image"|"blank", "name", "scene_id"}
+last_content: Optional[dict] = None
+# How long the last POST took: transfer + the ESP32's panel refresh
+last_refresh_ms: Optional[int] = None
+
+# The ESP32 has a single receive buffer, so frames are sent one at a time
+send_lock = asyncio.Lock()
 
 
 # ============================================================================
 # ESP32 Communication
 # ============================================================================
 
-async def send_to_esp32(data: bytes, ip: str = None, port: int = 80) -> dict:
-    """Send raw image data to ESP32"""
-    if ip is None:
-        ip = device_config.ip
-    
-    url = f"http://{ip}:{port}/api/display/raw"
-    
-    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        response = await client.post(
-            url,
-            content=data,
-            headers={"Content-Type": "application/octet-stream"}
-        )
-        response.raise_for_status()
-        return response.json()
+async def send_to_esp32(data: bytes, content: Optional[dict] = None) -> dict:
+    """Send raw image data to ESP32 and remember it as the last image"""
+    global last_image, last_update, last_content, last_refresh_ms
+
+    url = f"http://{device_config.ip}:{device_config.port}/api/display/raw"
+
+    async with send_lock:
+        started = time.perf_counter()
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            response = await client.post(
+                url,
+                content=data,
+                headers={"Content-Type": "application/octet-stream"}
+            )
+            response.raise_for_status()
+        last_refresh_ms = round((time.perf_counter() - started) * 1000)
+
+    last_image = data
+    last_update = datetime.now()
+    last_content = content
+    return response.json()
 
 
-async def get_esp32_status(ip: str = None, port: int = 80) -> dict:
+async def display_image(img: Image.Image, content: Optional[dict] = None) -> dict:
+    """Send an image to the display on user request (API/web UI)"""
+    try:
+        result = await send_to_esp32(generator.to_raw_bytes(img), content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e) or type(e).__name__)
+
+    # Keep the manually chosen image up for a full rotation interval
+    scene_manager.reset_timer()
+    return {"status": "ok", "result": result}
+
+
+def scene_content(scene) -> dict:
+    """Describe a scene image for last_content"""
+    return {"kind": "scene", "name": scene.name, "scene_id": scene.id}
+
+
+def display_info() -> dict:
+    """What is on the display right now (for the web UI)"""
+    return {
+        "kind": None, "name": None, "scene_id": None,
+        **(last_content or {}),
+        "last_update": last_update.isoformat() if last_update else None,
+        "age": round((datetime.now() - last_update).total_seconds(), 1) if last_update else None,
+        "refresh_ms": last_refresh_ms,
+    }
+
+
+async def get_esp32_status() -> dict:
     """Get ESP32 status"""
-    if ip is None:
-        ip = device_config.ip
-    
-    url = f"http://{ip}:{port}/api/status"
+    url = f"http://{device_config.ip}:{device_config.port}/api/status"
     
     async with httpx.AsyncClient(timeout=10) as client:
         response = await client.get(url)
@@ -326,8 +351,7 @@ if static_dir.exists():
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Main dashboard page"""
-    return templates.TemplateResponse("index.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "index.html", {
         "device_ip": device_config.ip,
         "last_update": last_update.isoformat() if last_update else None
     })
@@ -371,6 +395,7 @@ async def api_get_scenes():
     return {
         "scenes": scene_manager.get_all_scenes_info(),
         "manager": scene_manager.get_status(),
+        "display": display_info(),
     }
 
 
@@ -394,31 +419,29 @@ async def api_update_scene(scene_id: str, config: SceneConfigUpdate):
 @app.post("/api/scenes/{scene_id}/show")
 async def api_show_scene(scene_id: str):
     """Render and send a specific scene to display"""
-    global last_image, last_update
-    
     img = await scene_manager.render_scene(scene_id)
     if img is None:
         raise HTTPException(status_code=404, detail="Scene not found")
-    
-    raw = generator.to_raw_bytes(img)
-    
-    try:
-        result = await send_to_esp32(raw)
-        last_image = raw
-        last_update = datetime.now()
-        scene_manager.set_scene(scene_id)
-        return {"status": "ok", "result": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+    response = await display_image(img, scene_content(scene_manager.scenes[scene_id]))
+    scene_manager.set_scene(scene_id)
+    return response
 
 
 @app.get("/api/scenes/{scene_id}/preview")
-async def api_preview_scene(scene_id: str):
-    """Get preview image of a scene"""
-    img = await scene_manager.render_scene(scene_id)
-    if img is None:
+async def api_preview_scene(scene_id: str, cached: bool = False):
+    """Get preview image of a scene (black/white, as the panel shows it).
+    cached=true re-renders the last fetched data instead of calling the APIs."""
+    scene = scene_manager.scenes.get(scene_id)
+    if scene is None:
         raise HTTPException(status_code=404, detail="Scene not found")
-    
+
+    if cached:
+        img = await scene.render_cached(generator)
+    else:
+        img = await scene_manager.render_scene(scene_id)
+
+    img = generator.to_1bit(img)
     buf = io.BytesIO()
     preview = img.resize((img.width * 2, img.height * 2), Image.Resampling.NEAREST)
     preview.save(buf, format='PNG')
@@ -458,20 +481,11 @@ async def api_stop_rotation():
 @app.post("/api/rotation/next")
 async def api_next_scene():
     """Go to next scene"""
-    global last_image, last_update
-    
     scene_id = scene_manager.next_scene()
     img = await scene_manager.render_current_scene()
     
     if img:
-        raw = generator.to_raw_bytes(img)
-        try:
-            result = await send_to_esp32(raw)
-            last_image = raw
-            last_update = datetime.now()
-            return {"status": "ok", "scene": scene_id}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        await display_image(img, scene_content(scene_manager.get_current_scene()))
     
     return {"status": "ok", "scene": scene_id}
 
@@ -479,20 +493,11 @@ async def api_next_scene():
 @app.post("/api/rotation/prev")
 async def api_prev_scene():
     """Go to previous scene"""
-    global last_image, last_update
-    
     scene_id = scene_manager.prev_scene()
     img = await scene_manager.render_current_scene()
     
     if img:
-        raw = generator.to_raw_bytes(img)
-        try:
-            result = await send_to_esp32(raw)
-            last_image = raw
-            last_update = datetime.now()
-            return {"status": "ok", "scene": scene_id}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        await display_image(img, scene_content(scene_manager.get_current_scene()))
     
     return {"status": "ok", "scene": scene_id}
 
@@ -502,6 +507,7 @@ async def api_set_interval(interval: int):
     """Set rotation interval in seconds"""
     scene_manager.rotation_interval = max(10, min(3600, interval))
     scene_manager.save_config()
+    scene_manager.reset_timer()
     return {"status": "ok", "interval": scene_manager.rotation_interval}
 
 
@@ -558,18 +564,8 @@ async def api_mark_notification_read(notif_id: int):
 @app.post("/api/display/clear")
 async def api_clear_display(white: bool = True):
     """Clear the display"""
-    global last_image, last_update
-    
-    img = generator.create_blank(white)
-    raw = generator.to_raw_bytes(img)
-    
-    try:
-        result = await send_to_esp32(raw)
-        last_image = raw
-        last_update = datetime.now()
-        return {"status": "ok", "result": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    content = {"kind": "blank", "name": "White" if white else "Black"}
+    return await display_image(generator.create_blank(white), content)
 
 
 @app.post("/api/display/text")
@@ -578,45 +574,33 @@ async def api_display_text(
     title: str = Form("Message"),
 ):
     """Display text message"""
-    global last_image, last_update
-    
     img = generator.draw_notification(
         title, 
         text,
         datetime.now().strftime("%H:%M")
     )
-    raw = generator.to_raw_bytes(img)
-    
-    try:
-        result = await send_to_esp32(raw)
-        last_image = raw
-        last_update = datetime.now()
-        return {"status": "ok", "result": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return await display_image(img, {"kind": "message", "name": title})
 
 
 @app.post("/api/display/image")
 async def api_display_image(file: UploadFile = File(...)):
-    """Upload and display custom image"""
-    global last_image, last_update
-    
+    """Upload and display custom image (scaled to fit, white borders)"""
     try:
-        content = await file.read()
-        img = Image.open(io.BytesIO(content))
-        
-        img = img.resize((generator.width, generator.height), Image.Resampling.LANCZOS)
-        img = img.convert('1')
-        
-        raw = generator.to_raw_bytes(img)
-        result = await send_to_esp32(raw)
-        
-        last_image = raw
-        last_update = datetime.now()
-        return {"status": "ok", "result": result}
+        img = Image.open(io.BytesIO(await file.read()))
+        img = ImageOps.exif_transpose(img)
     
+        # Transparent areas should end up white, not black
+        if img.has_transparency_data:
+            img = img.convert('RGBA')
+            img = Image.alpha_composite(Image.new('RGBA', img.size, 'white'), img)
+        
+        img = ImageOps.pad(img.convert('L'), (generator.width, generator.height),
+                           method=Image.Resampling.LANCZOS, color=255)
+        img = img.convert('1')  # Dithered, better for photos than a threshold
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Invalid image: {e}")
+        
+    return await display_image(img, {"kind": "image", "name": file.filename or "Image"})
 
 
 @app.get("/api/display/current")
@@ -624,32 +608,23 @@ async def api_get_current():
     """Get current scene and render it"""
     scene = scene_manager.get_current_scene()
     if not scene:
-        return {"scene": None}
-    
+        return {"scene": None, "display": display_info()}
+
     return {
         "scene": scene.get_info(),
         "manager": scene_manager.get_status(),
+        "display": display_info(),
     }
 
 
 @app.post("/api/display/refresh")
 async def api_refresh_display():
     """Refresh current scene on display"""
-    global last_image, last_update
-    
     img = await scene_manager.render_current_scene()
     if img is None:
         raise HTTPException(status_code=404, detail="No scene to render")
     
-    raw = generator.to_raw_bytes(img)
-    
-    try:
-        result = await send_to_esp32(raw)
-        last_image = raw
-        last_update = datetime.now()
-        return {"status": "ok", "result": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return await display_image(img, scene_content(scene_manager.get_current_scene()))
 
 
 @app.get("/api/last-image")
@@ -658,16 +633,7 @@ async def api_last_image():
     if last_image is None:
         raise HTTPException(status_code=404, detail="No image sent yet")
     
-    img = Image.new('1', (DISPLAY_WIDTH, DISPLAY_HEIGHT), 1)
-    pixels = img.load()
-    
-    for y in range(DISPLAY_HEIGHT):
-        for x in range(DISPLAY_WIDTH):
-            byte_idx = (x // 8) + y * ((DISPLAY_WIDTH + 7) // 8)
-            bit_idx = 7 - (x % 8)
-            if not (last_image[byte_idx] & (1 << bit_idx)):
-                pixels[x, y] = 0
-    
+    img = Image.frombytes('1', (DISPLAY_WIDTH, DISPLAY_HEIGHT), last_image)
     img = img.rotate(90, expand=True)
     
     buf = io.BytesIO()

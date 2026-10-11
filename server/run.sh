@@ -1,4 +1,6 @@
 #!/bin/bash
+cd "$(dirname "$0")"
+
 echo "========================================"
 echo "  E-Paper Display Server"
 echo "========================================"
@@ -10,9 +12,15 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
+# Use a virtualenv: Homebrew/Debian Python refuse global pip installs (PEP 668)
+if [ ! -x .venv/bin/python ]; then
+    echo "Creating virtualenv in .venv..."
+    python3 -m venv .venv || exit 1
+fi
+
 # Install dependencies
 echo "Installing dependencies..."
-pip3 install -r requirements.txt -q
+.venv/bin/python -m pip install -r requirements.txt -q || exit 1
 
 echo
 echo "Starting server..."
@@ -23,5 +31,4 @@ echo "Press Ctrl+C to stop"
 echo "========================================"
 echo
 
-python3 -m uvicorn app:app --reload --host 0.0.0.0 --port 8000
-
+.venv/bin/python -m uvicorn app:app --reload --host 0.0.0.0 --port 8000

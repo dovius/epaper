@@ -132,9 +132,9 @@ class NotificationsScene(Scene):
             
             y += 36
             
-            # Separator line
+            # Separator line (below the message text, not through it)
             if y < generator.height - 20:
-                draw.line([(8, y - 6), (generator.width - 8, y - 6)], fill=0, width=1)
+                draw.line([(8, y - 1), (generator.width - 8, y - 1)], fill=0, width=1)
             
             if y > generator.height - 20:
                 break

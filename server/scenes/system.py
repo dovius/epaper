@@ -115,8 +115,8 @@ class SystemScene(Scene):
         font_time = generator.get_font(42, "mono")
         font_weekday = generator.get_font(20, "bold")
         font_date = generator.get_font(16, "mono")
-        font_label = generator.get_font(14, "medium")
-        font_value = generator.get_font(16, "mono")
+        font_label = generator.get_font(12, "medium")
+        font_value = generator.get_font(14, "mono")
         
         # Large time display
         time_str = data.get('time', '00:00')
@@ -128,20 +128,22 @@ class SystemScene(Scene):
             weekday = data.get('weekday_lt', '')
             
             draw.text((8, 66), weekday, font=font_weekday, fill=0)
-            draw.text((140, 68), date_str, font=font_date, fill=0)
+            # Right-aligned, so long names like "Ketvirtadienis" don't overlap it
+            date_x = generator.width - 6 - draw.textlength(date_str, font=font_date)
+            draw.text((date_x, 68), date_str, font=font_date, fill=0)
         
-        # Uptime section
-        draw.line([(6, 90), (generator.width - 6, 90)], fill=0, width=1)
+        # Uptime section (two rows that must fit above the bottom edge)
+        draw.line([(6, 89), (generator.width - 6, 89)], fill=0, width=1)
         
-        draw.text((6, 96), "Uptime:", font=font_label, fill=0)
+        draw.text((6, 92), "Uptime:", font=font_label, fill=0)
         uptime = data.get('uptime', '')
-        draw.text((70, 94), uptime, font=font_value, fill=0)
+        draw.text((60, 92), uptime, font=font_value, fill=0)
         
         # Start time
         start = data.get('start_time', '')
         if start:
-            draw.text((6, 112), "Start:", font=font_label, fill=0)
-            draw.text((55, 110), start, font=font_value, fill=0)
+            draw.text((6, 106), "Start:", font=font_label, fill=0)
+            draw.text((60, 106), start, font=font_value, fill=0)
         
         return img
 

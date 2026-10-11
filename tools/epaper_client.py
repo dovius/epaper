@@ -20,11 +20,7 @@ try:
     import requests
     from PIL import Image
 except ImportError:
-    print("Installing required packages...")
-    import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests", "Pillow"])
-    import requests
-    from PIL import Image
+    sys.exit("Missing packages, install them with: pip install requests Pillow")
 
 
 # Display configuration
@@ -100,28 +96,16 @@ class EPaperClient:
         # Resize to display dimensions (rotated: 250x122 -> 122x250)
         img = img.resize((DISPLAY_HEIGHT, DISPLAY_WIDTH), Image.Resampling.LANCZOS)
         
-        # Rotate 90 degrees (display is rotated)
-        img = img.rotate(90, expand=True)
+        # Rotate clockwise into the panel's portrait frame (same as the server,
+        # rotating the other way shows the image upside down)
+        img = img.rotate(-90, expand=True)
         
         # Convert to 1-bit (black and white)
         img = img.convert('1')
         
-        # Convert to raw bytes
-        # E-paper format: 1 = white, 0 = black
-        raw = bytearray(FRAME_BUFFER_SIZE)
-        pixels = img.load()
-        
-        for y in range(DISPLAY_HEIGHT):
-            for x in range(DISPLAY_WIDTH):
-                byte_idx = (x // 8) + y * ((DISPLAY_WIDTH + 7) // 8)
-                bit_idx = 7 - (x % 8)
-                
-                # PIL 1-bit: 255 = white, 0 = black
-                # E-paper: 1 = white, 0 = black
-                if pixels[x, y]:
-                    raw[byte_idx] |= (1 << bit_idx)
-        
-        return bytes(raw)
+        # Mode '1' packs each row MSB-first, padded to whole bytes, 1 = white:
+        # the same layout as the e-paper frame buffer
+        return img.tobytes()
 
 
 def main():

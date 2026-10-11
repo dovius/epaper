@@ -7,7 +7,8 @@ Manages scene rotation, configuration, and display updates.
 import asyncio
 import json
 import logging
-from datetime import datetime
+import os
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -30,7 +31,9 @@ logger = logging.getLogger(__name__)
 class SceneManager:
     """Manages all scenes and rotation"""
     
-    CONFIG_FILE = Path(__file__).parent / "scene_config.json"
+    # Holds API keys, so it's gitignored. In Docker point SCENE_CONFIG at a
+    # mounted directory (see docker-compose.yml).
+    CONFIG_FILE = Path(os.environ.get("SCENE_CONFIG", Path(__file__).parent / "scene_config.json"))
     
     def __init__(self, generator):
         self.generator = generator
@@ -40,6 +43,8 @@ class SceneManager:
         self.rotation_enabled: bool = True
         self.rotation_interval: int = 60  # seconds
         self._rotation_task: Optional[asyncio.Task] = None
+        self._timer_reset = asyncio.Event()
+        self._next_rotation: Optional[datetime] = None
         self._last_update: Optional[datetime] = None
         self._send_callback = None
         
@@ -102,8 +107,13 @@ class SceneManager:
         }
         
         try:
-            with open(self.CONFIG_FILE, 'w') as f:
+            self.CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+            # Write to a temp file and swap it in, so a crash mid-write can't
+            # leave a truncated config (and lose the API keys)
+            tmp_file = self.CONFIG_FILE.with_name(self.CONFIG_FILE.name + '.tmp')
+            with open(tmp_file, 'w') as f:
                 json.dump(config, f, indent=2)
+            os.replace(tmp_file, self.CONFIG_FILE)
             logger.info(f"Saved scene config to {self.CONFIG_FILE}")
         except Exception as e:
             logger.error(f"Failed to save scene config: {e}")
@@ -126,13 +136,32 @@ class SceneManager:
             return None
         
         # Handle notifications priority
-        if 'notifications' in self.scenes:
-            notif_scene = self.scenes['notifications']
-            if notif_scene.config.enabled and NotificationsScene.has_notifications():
-                return notif_scene
+        priority = self._priority_scene()
+        if priority:
+            return priority
         
         idx = self.current_scene_idx % len(enabled)
         return self.scenes.get(enabled[idx])
+    
+    def get_next_scene(self) -> Optional[Scene]:
+        """Get the scene the rotation will show next"""
+        enabled = self.get_enabled_scenes()
+        if not enabled:
+            return None
+        
+        priority = self._priority_scene()
+        if priority:
+            return priority
+        
+        idx = (self.current_scene_idx + 1) % len(enabled)
+        return self.scenes.get(enabled[idx])
+    
+    def _priority_scene(self) -> Optional[Scene]:
+        """Notifications take over the display while there are unread ones"""
+        notif_scene = self.scenes.get('notifications')
+        if notif_scene and notif_scene.config.enabled and NotificationsScene.has_notifications():
+            return notif_scene
+        return None
     
     async def render_current_scene(self) -> Optional[Image.Image]:
         """Render the current scene"""
@@ -204,11 +233,21 @@ class SceneManager:
         self.save_config()
         return True
     
+    def reset_timer(self):
+        """Restart the rotation countdown (manual display change, new interval)"""
+        self._timer_reset.set()
+    
     async def _rotation_loop(self):
         """Background rotation loop"""
         while True:
             try:
-                await asyncio.sleep(self.rotation_interval)
+                self._timer_reset.clear()
+                self._next_rotation = datetime.now() + timedelta(seconds=self.rotation_interval)
+                try:
+                    await asyncio.wait_for(self._timer_reset.wait(), self.rotation_interval)
+                    continue  # Timer was reset, start counting again
+                except asyncio.TimeoutError:
+                    pass
                 
                 if not self.rotation_enabled:
                     continue
@@ -216,11 +255,14 @@ class SceneManager:
                 self.next_scene()
                 
                 if self._send_callback:
+                    scene = self.get_current_scene()
                     img = await self.render_current_scene()
-                    if img:
+                    # Don't overwrite an image sent manually while rendering
+                    if img and not self._timer_reset.is_set():
                         raw = self.generator.to_raw_bytes(img)
                         try:
-                            await self._send_callback(raw)
+                            content = {'kind': 'scene', 'name': scene.name, 'scene_id': scene.id}
+                            await self._send_callback(raw, content)
                             self._last_update = datetime.now()
                         except Exception as e:
                             logger.error(f"Failed to send scene: {e}")
@@ -241,11 +283,19 @@ class SceneManager:
         if self._rotation_task:
             self._rotation_task.cancel()
             self._rotation_task = None
+            self._next_rotation = None
             logger.info("Scene rotation stopped")
     
     def get_status(self) -> dict:
         """Get manager status for API"""
         current = self.get_current_scene()
+        upcoming = self.get_next_scene()
+        
+        # Seconds until the next automatic change (None when rotation is off)
+        next_in = None
+        if self.rotation_enabled and self._next_rotation:
+            next_in = round(max(0.0, (self._next_rotation - datetime.now()).total_seconds()), 1)
+        
         return {
             'rotation_enabled': self.rotation_enabled,
             'rotation_interval': self.rotation_interval,
@@ -254,6 +304,9 @@ class SceneManager:
             'enabled_scenes': self.get_enabled_scenes(),
             'rotation_order': self.rotation_order,
             'last_update': self._last_update.isoformat() if self._last_update else None,
+            'next_scene': upcoming.id if upcoming else None,
+            'next_scene_name': upcoming.name if upcoming else None,
+            'next_rotation_in': next_in,
         }
     
     def get_all_scenes_info(self) -> list[dict]:

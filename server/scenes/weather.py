@@ -66,6 +66,9 @@ class WeatherScene(Scene):
             if city.lower() != 'vilnius':
                 geo_url = f"https://geocoding-api.open-meteo.com/v1/search"
                 params = {'name': city, 'count': 1}
+                country_code = self.config.settings.get('country_code', '')
+                if country_code:
+                    params['countryCode'] = country_code
                 resp = await client.get(geo_url, params=params)
                 if resp.status_code == 200:
                     geo_data = resp.json()
@@ -81,8 +84,8 @@ class WeatherScene(Scene):
             params = {
                 'latitude': lat,
                 'longitude': lon,
-                'daily': 'temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max',
-                'current_weather': 'true',
+                'daily': 'temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max',
+                'current': 'temperature_2m',
                 'temperature_unit': temp_unit,
                 'timezone': 'auto',
                 'forecast_days': 3,
@@ -92,7 +95,7 @@ class WeatherScene(Scene):
             resp.raise_for_status()
             data = resp.json()
             
-            current = data.get('current_weather', {})
+            current = data.get('current', {})
             daily = data.get('daily', {})
             
             # Parse daily forecasts
@@ -100,7 +103,7 @@ class WeatherScene(Scene):
             dates = daily.get('time', [])
             temps_max = daily.get('temperature_2m_max', [])
             temps_min = daily.get('temperature_2m_min', [])
-            codes = daily.get('weathercode', [])
+            codes = daily.get('weather_code', [])
             precip = daily.get('precipitation_probability_max', [])
             
             day_names = ['Šiandien', 'Rytoj', 'Poryt']
@@ -116,7 +119,7 @@ class WeatherScene(Scene):
             
             return {
                 'city': city,
-                'current_temp': current.get('temperature', 0),
+                'current_temp': current.get('temperature_2m'),
                 'forecasts': forecasts,
                 'unit': '°C' if units == 'metric' else '°F',
             }
@@ -148,7 +151,11 @@ class WeatherScene(Scene):
         """Render weather forecast"""
         img = generator.create_blank()
         city = data.get('city', 'Weather')
-        generator.draw_header(img, f"{city}")
+        current_temp = data.get('current_temp')
+        if current_temp is not None:
+            generator.draw_header(img, f"{city}  {current_temp:.0f}{data.get('unit', '')}")
+        else:
+            generator.draw_header(img, f"{city}")
         
         draw = ImageDraw.Draw(img)
         forecasts = data.get('forecasts', [])
@@ -158,6 +165,10 @@ class WeatherScene(Scene):
         font_weather = generator.get_font(16, "bold")
         font_precip = generator.get_font(14, "mono")
         
+        # Right-aligned columns, so "-12/-18" and "100%" never overlap
+        precip_right = generator.width - 4
+        temp_right = precip_right - draw.textlength("100%", font=font_precip) - 6
+        
         y = 26
         row_height = 32
         
@@ -166,7 +177,7 @@ class WeatherScene(Scene):
             temp_max = forecast.get('temp_max', 0)
             temp_min = forecast.get('temp_min', 0)
             code = forecast.get('code', 0)
-            precip = forecast.get('precip', 0)
+            precip = forecast.get('precip') or 0  # null when the model has no data
             
             weather_text = self._get_weather_text(code)
             
@@ -178,11 +189,14 @@ class WeatherScene(Scene):
             
             # Temperatures (right side)
             temp_str = f"{temp_max:.0f}/{temp_min:.0f}"
-            draw.text((140, y + 4), temp_str, font=font_temp, fill=0)
+            temp_x = temp_right - draw.textlength(temp_str, font=font_temp)
+            draw.text((temp_x, y + 4), temp_str, font=font_temp, fill=0)
             
             # Precipitation chance
             if precip > 0:
-                draw.text((200, y + 6), f"{precip}%", font=font_precip, fill=0)
+                precip_str = f"{precip}%"
+                precip_x = precip_right - draw.textlength(precip_str, font=font_precip)
+                draw.text((precip_x, y + 6), precip_str, font=font_precip, fill=0)
             
             y += row_height
             

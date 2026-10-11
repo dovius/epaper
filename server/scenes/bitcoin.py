@@ -55,7 +55,7 @@ class BitcoinScene(Scene):
                 for i, (timestamp, price) in enumerate(prices):
                     if i % 2 == 0:
                         history.append(price)
-            except:
+            except Exception:
                 pass
             
             return {
