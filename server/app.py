@@ -625,8 +625,12 @@ async def api_mark_notification_read(notif_id: int):
 @app.post("/api/digest/run")
 async def api_run_digest():
     """Write a new AI digest now (Claude API with web search, costs a little)"""
+    scene = scene_manager.scenes['digest']
+    problem = scene.not_ready()
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
     try:
-        state = await scene_manager.scenes['digest'].run()
+        state = await scene.run()
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e) or type(e).__name__)
     return {"status": "ok", "digest": state}
