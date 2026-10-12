@@ -52,7 +52,8 @@ landscape) on the owner's desk in their homelab.
   for hold_minutes, then the rotation continues.
 - Pick the tool by intent: show_message for a quick note; notify for something the
   owner should act on (unread notifications take over the display until read);
-  show_layout for a custom screen (check it with preview_layout first).
+  show_layout for a custom screen (check it with preview_layout first);
+  set_agent_scene for content that should keep coming back in the rotation.
 - The fonts have Latin letters (Lithuanian too), digits and common symbols
   (• … ° € → ✓) but no emoji, which are removed.
 - Tools that change the display return a picture of the result. Look at it and at
@@ -153,6 +154,7 @@ def build_mcp(ctx: ServerContext) -> MCPServer:
     """Create the MCP server and its tools"""
     mcp = MCPServer("epaper", title="E-Paper display", instructions=INSTRUCTIONS)
     push_limit = RateLimit(MIN_PUSH_SECONDS, "The display")
+    digest_limit = RateLimit(600, "The digest")
     gen = ctx.generator
 
     def get_scene(scene_id: str):
@@ -411,6 +413,58 @@ def build_mcp(ctx: ServerContext) -> MCPServer:
             "rotation_enabled", "rotation_interval", "current_scene", "next_scene",
             "next_rotation_in", "held_until")})
         return out
+
+    # --- Agent board and digest ---------------------------------------------
+
+    @mcp.tool(annotations=CHANGES_DISPLAY)
+    async def set_agent_scene(
+        title: Annotated[str, Field(max_length=60, description="Header text when the blocks don't start with a header")],
+        blocks: Blocks,
+        show_now: Annotated[bool, Field(description="Also show it on the display right away")] = False,
+    ) -> list:
+        """Put a layout on the Agent Board, a scene that stays in the rotation until
+        you change or clear it: a dashboard, a to-do list, a countdown, a reminder for
+        the day. The header gets the update time on the right."""
+        scene = get_scene("agent")
+        scene.set_content(title, blocks)
+        img, warnings = render_layout(scene.blocks(await scene.fetch_data()), gen)
+        if not scene.config.enabled:
+            warnings.append("The Agent Board scene is not in the rotation "
+                            "(add it with set_scene_enabled, scene_id 'agent')")
+        if show_now:
+            await push(img, scene_content(scene))
+            return result(img, "Agent Board updated and shown.", warnings)
+        return result(img, "Agent Board updated.", warnings)
+
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=True))
+    async def clear_agent_scene() -> str:
+        """Empty the Agent Board."""
+        get_scene("agent").clear()
+        return "Agent Board cleared."
+
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=True))
+    async def refresh_digest(
+        show_now: Annotated[bool, Field(description="Also show it on the display right away")] = False,
+    ) -> list:
+        """Have the server write a new AI Digest now (the news headlines scene). It
+        searches the web with the Claude API, takes a minute or two and costs the
+        owner roughly $0.15-0.30, so only do this when asked."""
+        scene = get_scene("digest")
+        problem = scene.not_ready()
+        if problem:
+            raise ToolError(problem)
+        digest_limit.check()
+        digest_limit.mark()
+        try:
+            state = await scene.run()
+        except Exception as e:
+            raise ToolError(f"The digest failed: {e}") from e
+        img = await scene.generate(gen)
+        if show_now:
+            await push(img, scene_content(scene))
+        usage = state["usage"]
+        return result(img, f"Digest written with {state['model']}: {usage['web_searches']} searches, "
+                           f"{usage['input_tokens']} input and {usage['output_tokens']} output tokens.")
 
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True))
     async def set_scene_enabled(

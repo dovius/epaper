@@ -356,6 +356,7 @@ async def lifespan(app: FastAPI):
     # Start rotation if enabled
     if scene_manager.rotation_enabled:
         scene_manager.start_rotation()
+    digest_task = asyncio.create_task(scene_manager.scenes['digest'].schedule_loop())
     
     if MCP_TOKEN:
         logger.info("MCP enabled at /mcp/")
@@ -368,6 +369,7 @@ async def lifespan(app: FastAPI):
         yield
     
     # Cleanup
+    digest_task.cancel()
     if scene_manager:
         scene_manager.stop_rotation()
     
@@ -618,6 +620,16 @@ async def api_mark_notification_read(notif_id: int):
     if not NotificationsScene.mark_read(notif_id):
         raise HTTPException(status_code=404, detail="Notification not found")
     return {"status": "ok"}
+
+
+@app.post("/api/digest/run")
+async def api_run_digest():
+    """Write a new AI digest now (Claude API with web search, costs a little)"""
+    try:
+        state = await scene_manager.scenes['digest'].run()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e) or type(e).__name__)
+    return {"status": "ok", "digest": state}
 
 
 # ============================================================================

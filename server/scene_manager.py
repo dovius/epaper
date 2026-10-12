@@ -23,6 +23,8 @@ from scenes import (
     NotificationsScene,
     NetworkScene,
     SystemScene,
+    AgentScene,
+    DigestScene,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,6 +69,8 @@ class SceneManager:
             NotificationsScene,
             NetworkScene,
             SystemScene,
+            AgentScene,
+            DigestScene,
         ]
         
         for cls in scene_classes:
@@ -86,7 +90,9 @@ class SceneManager:
             # Load global settings
             self.rotation_enabled = config.get('rotation_enabled', True)
             self.rotation_interval = config.get('rotation_interval', 60)
-            self.rotation_order = config.get('rotation_order', self.rotation_order)
+            saved_order = config.get('rotation_order', self.rotation_order)
+            # Scenes added since the config was saved go at the end
+            self.rotation_order = saved_order + [sid for sid in self.rotation_order if sid not in saved_order]
             self.current_scene_idx = config.get('current_scene_idx', 0)
             
             # Load scene configs

@@ -11,6 +11,8 @@ from .weather import WeatherScene
 from .notifications import NotificationsScene
 from .network import NetworkScene
 from .system import SystemScene
+from .agent import AgentScene
+from .digest import DigestScene
 
 __all__ = [
     'Scene',
@@ -21,5 +23,7 @@ __all__ = [
     'NotificationsScene',
     'NetworkScene',
     'SystemScene',
+    'AgentScene',
+    'DigestScene',
 ]
 
