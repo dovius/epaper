@@ -17,9 +17,26 @@ services:
       - SCENE_CONFIG=/app/data/scene_config.json
       # Local time for the clock and timestamps (containers default to UTC)
       - TZ=${TZ:-Europe/Vilnius}
+      # Bearer token for the MCP endpoint /mcp/ (empty = MCP off)
+      - MCP_TOKEN=${MCP_TOKEN:-}
+      - MCP_MIN_PUSH_SECONDS=${MCP_MIN_PUSH_SECONDS:-10}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/api/device/config').raise_for_status()"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # Public HTTPS for the MCP endpoint (claude.ai connects from Anthropic's cloud).
+  # Only started with: docker compose --profile tunnel up -d
+  # The tunnel's public hostname must only route /mcp (see DEPLOY.md).
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.3
+    container_name: epaper-tunnel
+    profiles: [tunnel]
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - epaper-server
+    restart: unless-stopped

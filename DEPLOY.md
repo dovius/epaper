@@ -10,6 +10,7 @@ nothing here needs to be guessed.
 |------|-------|---------|
 | Server: renders scenes, rotates them, web dashboard on port 8000 | `server/` | Docker on an always-on Linux host (NAS, mini PC, Pi 64-bit) or a Mac |
 | Firmware: receives 4000-byte 1-bit frames over HTTP and shows them | `src/` | ESP32 + Waveshare 2.13" V4, flashed once over USB |
+| Optional: MCP endpoint for Claude, public through a Cloudflare Tunnel | `server/` (`cloudflared` service) | Same Docker host |
 
 The server calls the ESP32 (`POST http://ESP32_IP/api/display/raw`); the ESP32
 never calls the server. Both must be on the same LAN. The server also needs
@@ -60,7 +61,8 @@ Updating later: `git pull && docker compose up -d --build`. Settings survive
 because they are in `./data`.
 
 Notes:
-- Keep port 8000 on the LAN. There is no authentication.
+- Keep port 8000 on the LAN. There is no authentication, except for the MCP
+  endpoint `/mcp/` (section 4).
 - The default `bridge` network reaches LAN IPs (ESP32, OctoPrint) through NAT.
   If it can't, set `DOCKER_NETWORK_MODE=host` in `.env` (Linux only).
 - An older container named `epaper-server` from a previous setup is simply
@@ -114,6 +116,88 @@ These are set in `src/config/Config.h`.
 4. Scenes with an **Error** badge: open them to see the message. It usually means
    an external API is down or rate limited, or an API key is missing.
 
+## 4. Claude over MCP (optional)
+
+The server has an MCP endpoint at `/mcp/`. With it Claude can see what the
+display shows and control it: messages, custom layouts, notifications, scenes,
+the rotation, the Agent Board and the AI Digest. Claude Code on the LAN
+connects to it directly. claude.ai, Claude Desktop and the mobile apps connect
+from Anthropic's cloud, so they need a public HTTPS address: a Cloudflare
+Tunnel that routes only `/mcp`.
+
+### 4.1 Turn it on
+
+```bash
+cd epaper/server
+openssl rand -hex 32          # put the output in .env as MCP_TOKEN
+docker compose up -d
+```
+
+Checks:
+
+```bash
+docker compose logs epaper-server | grep MCP                                    # MCP enabled at /mcp/
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:8000/mcp/   # 401 (no token)
+```
+
+### 4.2 Claude Code on the LAN
+
+```bash
+claude mcp add --transport http epaper http://<host>:8000/mcp/ \
+  --header "Authorization: Bearer <MCP_TOKEN>"
+```
+
+Check: `/mcp` in Claude Code lists `epaper` as connected, and "What's on the
+e-paper display?" gets an answer with a picture of the screen.
+
+### 4.3 claude.ai, Claude Desktop and mobile (Cloudflare Tunnel)
+
+Requirements: a domain on Cloudflare (the free plan is enough).
+
+1. Cloudflare dashboard > Zero Trust > Networks > Tunnels > Create a tunnel >
+   Cloudflared, name `epaper`. Copy the token from the install command (the
+   long string after `--token`) into `.env` as `CLOUDFLARE_TUNNEL_TOKEN`.
+2. Add a public hostname to the tunnel: subdomain `epaper`, your domain,
+   **path `^/mcp`**, service `HTTP` `epaper-server:8000`. Never add a hostname
+   without the path: the dashboard and REST API have no authentication, and
+   `/api/scenes` shows the API keys. (The server also refuses everything but
+   `/mcp/` from the tunnel, as a second line of defense.) With
+   `DOCKER_NETWORK_MODE=host` the service is `<host LAN IP>:8000` instead.
+3. Start the tunnel:
+   ```bash
+   docker compose --profile tunnel up -d
+   ```
+4. Checks:
+   ```bash
+   docker compose logs cloudflared | grep -i "registered tunnel connection"   # 4 connections
+   curl -s -o /dev/null -w "%{http_code}\n" https://epaper.<domain>/         # 404
+   curl -s -o /dev/null -w "%{http_code}\n" -X POST https://epaper.<domain>/mcp/   # 401
+   ```
+5. claude.ai > Customize > Connectors > Add custom connector:
+   - URL `https://epaper.<domain>/mcp/` (with the trailing slash)
+   - Authentication: **No sign in**
+   - Request header: `Authorization` = `Bearer <MCP_TOKEN>`
+
+   The connector is then also available in Claude Desktop and the mobile apps.
+   Check: in a chat with the connector on, "Show 'Hello from Claude' on the
+   e-paper display" changes the panel within a few seconds.
+6. Optional hardening: a Cloudflare WAF custom rule for this hostname that
+   blocks requests not coming from Anthropic's IP ranges (listed in Anthropic's
+   docs). Claude Code keeps using the LAN address.
+
+Changing the token: edit `.env`, `docker compose up -d`, then remove and re-add
+the claude.ai connector (connectors can't be edited) and re-run
+`claude mcp add` with the new token.
+
+### 4.4 AI Digest (optional)
+
+The AI Digest scene has Claude write news headlines with web search, at the
+times in its settings. In the dashboard open **AI Digest**, set the Anthropic
+API key (console.anthropic.com), topics, language and times, turn it on, then
+**Run now**. A run costs roughly $0.15-0.30 with the default model.
+
+Check: the scene shows headlines and no Error badge.
+
 ## Troubleshooting
 
 | Symptom | Likely cause and fix |
@@ -126,3 +210,7 @@ These are set in `src/config/Config.h`.
 | OctoPrint shows Offline | The printer is off, or the URL/key in the scene settings is wrong. |
 | `pio run` fails on `Secrets.h` | Copy `Secrets.h.example` to `Secrets.h` (step 2). |
 | Panel stays blank after flashing | Check the wiring and look at `pio device monitor` for `[EPD] Busy timeout!`. |
+| `/mcp/` answers 503 | `MCP_TOKEN` isn't set in `.env`, then `docker compose up -d`. |
+| claude.ai can't connect to the connector | The URL must end in `/mcp/` and the header must be `Authorization: Bearer <MCP_TOKEN>`. `curl -X POST https://epaper.<domain>/mcp/` must give 401: 404 means the tunnel path is wrong, 502 that the tunnel can't reach the server (host network mode: use the LAN IP as the service). |
+| A tool says "The display was just updated" | MCP updates are limited to one per `MCP_MIN_PUSH_SECONDS` (10 s): every update is a full refresh. |
+| AI Digest shows "Last run failed" | Open the scene for the error: usually a missing or wrong API key, or no credit on the Anthropic account. |

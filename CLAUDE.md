@@ -11,6 +11,8 @@ with Pillow and pushes them to the ESP32 as 4000-byte 1-bit frames over HTTP.
   - `app.py`: API and ESP32 I/O.
   - `scene_manager.py`: rotation.
   - `scenes/`: one file per scene.
+  - `layout.py`: screens from JSON blocks, used by the MCP tools and text scenes.
+  - `mcp_server.py`: MCP endpoint `/mcp/` (bearer token `MCP_TOKEN`).
   - `templates/index.html`: dashboard, vanilla JS, no build step.
   - Runtime settings with API keys live in `scene_config.json` or `data/`, both gitignored.
 - `tools/epaper_client.py`: talks to the ESP32 directly, without the server.
@@ -27,6 +29,10 @@ with Pillow and pushes them to the ESP32 as 4000-byte 1-bit frames over HTTP.
   The dashboard must load without console errors and the scenes must render
   (`/api/scenes/<id>/preview`). Without an ESP32, point `POST /api/device/config`
   at a small fake HTTP server that accepts `POST /api/display/raw`.
+- **MCP:** with `MCP_TOKEN` set, connect an MCP client to `/mcp/` (e.g. MCP
+  Inspector, or the Python SDK client with the `Authorization` header) and call
+  the tools you changed. Through the tunnel nothing but `/mcp/` may answer:
+  `curl -H "Cf-Ray: x" localhost:8000/api/scenes` must give 404.
 - **Docker:** in `server/`, run `docker compose up -d --build`. The container must
   become healthy and the logs must show the fonts loading from `/app/fonts`.
 

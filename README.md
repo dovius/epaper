@@ -10,6 +10,11 @@ display with an HTTP API; everything you see is rendered by a Python server
 - **OctoPrint** printer status
 - **Notifications** pushed over the API
 - **System** clock and uptime
+- **AI Digest**: news headlines Claude writes with web search
+- **Agent Board**: a screen Claude keeps up to date
+
+Claude can also control the display directly over MCP (claude.ai, the Claude
+apps, Claude Code): messages, layouts, notifications, scenes.
 
 ```
 ┌─────────────────┐   POST /api/display/raw   ┌──────────────┐
