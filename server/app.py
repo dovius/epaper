@@ -24,9 +24,11 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from mcp.server.transport_security import TransportSecuritySettings
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from layout import Block, HeaderBlock, TextBlock, layout_name, render_layout
+from mcp_server import BearerAuth, ServerContext, TunnelGuard, build_mcp
 from scene_manager import SceneManager
 from scenes import NotificationsScene, SystemScene
 
@@ -43,6 +45,9 @@ FRAME_BUFFER_SIZE = ((DISPLAY_WIDTH + 7) // 8) * DISPLAY_HEIGHT
 
 ESP32_DEFAULT_IP = os.environ.get("ESP32_IP", "192.168.1.231")
 TIMEOUT = 30
+
+# Bearer token for the MCP endpoint (/mcp/). Without it MCP is off.
+MCP_TOKEN = os.environ.get("MCP_TOKEN", "")
 
 FONTS_DIR = Path(__file__).parent / "fonts"
 
@@ -312,6 +317,29 @@ async def get_esp32_status() -> dict:
 
 
 # ============================================================================
+# MCP
+# ============================================================================
+
+mcp = build_mcp(ServerContext(
+    generator=generator,
+    scene_manager=lambda: scene_manager,
+    push_image=push_image,
+    display_info=display_info,
+    device_status=get_esp32_status,
+    device_address=lambda: f"{device_config.ip}:{device_config.port}",
+    last_frame=lambda: frame_to_image(last_image) if last_image else None,
+    png_preview=png_preview,
+))
+# Clients use /mcp/ (with the slash). The SDK's Host check (against DNS
+# rebinding) is off: requests arrive with the tunnel's domain or the NAS IP,
+# and a browser tricked by DNS rebinding can't send the bearer token anyway.
+mcp_app = mcp.streamable_http_app(
+    streamable_http_path="/",
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
+
+
+# ============================================================================
 # App Lifecycle
 # ============================================================================
 
@@ -329,9 +357,15 @@ async def lifespan(app: FastAPI):
     if scene_manager.rotation_enabled:
         scene_manager.start_rotation()
     
+    if MCP_TOKEN:
+        logger.info("MCP enabled at /mcp/")
+    else:
+        logger.info("MCP disabled: set MCP_TOKEN to enable /mcp/")
     logger.info("E-Paper server started")
     
-    yield
+    # The mounted MCP app's own lifespan doesn't run, so start its sessions here
+    async with mcp.session_manager.run():
+        yield
     
     # Cleanup
     if scene_manager:
@@ -360,6 +394,10 @@ static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(exist_ok=True)
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+app.mount("/mcp", BearerAuth(mcp_app, MCP_TOKEN))
+# Through the Cloudflare tunnel only /mcp/ is reachable
+app.add_middleware(TunnelGuard)
 
 
 # ============================================================================
