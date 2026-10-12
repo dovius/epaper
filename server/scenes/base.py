@@ -2,12 +2,17 @@
 Base Scene class and configuration
 """
 
+import json
 import logging
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 from PIL import Image
+
+from layout import wrap_text
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +54,9 @@ class Scene(ABC):
     
     # Default settings schema for UI
     settings_schema: list[dict] = []
+    
+    # Where scenes keep runtime state (next to scene_config.json, set by SceneManager)
+    data_dir: Path = Path(__file__).parent.parent
     
     def __init__(self, config: Optional[SceneConfig] = None):
         self.config = config or SceneConfig()
@@ -104,27 +112,39 @@ class Scene(ABC):
         generator.draw_header(img, f"{self.name}")
         generator.draw_text(img, "Error:", 8, 30, font_size=16, style="bold")
         
-        # Word wrap error message
-        words = error.split()
-        lines = []
-        current = ""
-        for word in words:
-            test = f"{current} {word}".strip()
-            if len(test) < 24:
-                current = test
-            else:
-                if current:
-                    lines.append(current)
-                current = word
-        if current:
-            lines.append(current)
-        
+        lines = wrap_text(error, generator.get_font(14, "medium"), generator.width - 16)
         y = 50
         for line in lines[:4]:
             generator.draw_text(img, line, 8, y, font_size=14, style="medium")
             y += 18
         
         return img
+    
+    @classmethod
+    def load_state(cls, name: str, default: Any = None) -> Any:
+        """Read a JSON state file from data_dir"""
+        path = cls.data_dir / name
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return default
+        except Exception as e:
+            logger.error(f"Failed to read {path}: {e}")
+            return default
+    
+    @classmethod
+    def save_state(cls, name: str, data: Any):
+        """Write a JSON state file to data_dir (atomically, like the scene config)"""
+        path = cls.data_dir / name
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_name(path.name + '.tmp')
+            with open(tmp, 'w') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            os.replace(tmp, path)
+        except Exception as e:
+            logger.error(f"Failed to write {path}: {e}")
     
     def get_info(self) -> dict:
         """Get scene info for API"""

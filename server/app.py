@@ -20,12 +20,13 @@ from typing import Optional
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
+from layout import Block, HeaderBlock, TextBlock, layout_name, render_layout
 from scene_manager import SceneManager
 from scenes import NotificationsScene, SystemScene
 
@@ -66,6 +67,13 @@ class NotificationCreate(BaseModel):
     title: str
     message: str
     priority: str = "normal"
+    expires_in_minutes: Optional[int] = Field(None, gt=0, le=10080)
+    show_now: bool = False
+
+
+class LayoutRequest(BaseModel):
+    blocks: list[Block] = Field(max_length=20)
+    hold_minutes: Optional[float] = Field(None, gt=0, le=1440)
 
 
 # ============================================================================
@@ -158,42 +166,33 @@ class ImageGenerator:
         draw.line([(0, y), (self.width, y)], fill=0, width=1)
         return img
     
+    def render_message(self, title: str, message: str,
+                       timestamp: Optional[str] = None) -> tuple[Image.Image, list[str]]:
+        """Message card: title bar (with the time on the right) and wrapped text.
+        Also returns warnings about text that didn't fit (see layout.py)."""
+        return render_layout([
+            HeaderBlock.model_construct(text=title, right=timestamp),
+            TextBlock.model_construct(text=message),
+        ], self)
+    
     def draw_notification(self, title: str, message: str, 
                           timestamp: Optional[str] = None) -> Image.Image:
         """Draw a notification card"""
-        img = self.create_blank()
-        self.draw_header(img, title)
+        return self.render_message(title, message, timestamp)[0]
+    
+    def fit_image(self, data: bytes) -> Image.Image:
+        """Decode an uploaded image and fit it to the display (scaled, white borders)"""
+        img = Image.open(io.BytesIO(data))
+        img = ImageOps.exif_transpose(img)
         
-        draw = ImageDraw.Draw(img)
-        font = self.get_font(18, "medium")
+        # Transparent areas should end up white, not black
+        if img.has_transparency_data:
+            img = img.convert('RGBA')
+            img = Image.alpha_composite(Image.new('RGBA', img.size, 'white'), img)
         
-        # Word wrap
-        words = message.split()
-        lines = []
-        current_line = ""
-        
-        for word in words:
-            test_line = f"{current_line} {word}".strip()
-            bbox = font.getbbox(test_line)
-            if bbox[2] < self.width - 16:
-                current_line = test_line
-            else:
-                if current_line:
-                    lines.append(current_line)
-                current_line = word
-        if current_line:
-            lines.append(current_line)
-        
-        y = 28
-        for line in lines[:5]:
-            draw.text((8, y), line, font=font, fill=0)
-            y += 20
-        
-        if timestamp:
-            font_small = self.get_font(14, "mono")
-            draw.text((8, self.height - 18), timestamp, font=font_small, fill=0)
-        
-        return img
+        img = ImageOps.pad(img.convert('L'), (self.width, self.height),
+                           method=Image.Resampling.LANCZOS, color=255)
+        return img.convert('1')  # Dithered, better for photos than a threshold
     
     def to_1bit(self, img: Image.Image) -> Image.Image:
         """Convert to pure black/white exactly as the panel shows it"""
@@ -210,6 +209,11 @@ class ImageGenerator:
         return img.tobytes()
 
 
+def frame_to_image(frame: bytes) -> Image.Image:
+    """The landscape image a raw frame shows"""
+    return Image.frombytes('1', (DISPLAY_WIDTH, DISPLAY_HEIGHT), frame).rotate(90, expand=True)
+
+
 # ============================================================================
 # Global State
 # ============================================================================
@@ -219,7 +223,8 @@ device_config = DeviceConfig()
 scene_manager: Optional[SceneManager] = None
 last_image: Optional[bytes] = None
 last_update: Optional[datetime] = None
-# What the last image shows: {"kind": "scene"|"message"|"image"|"blank", "name", "scene_id"}
+# What the last image shows: {"kind": "scene"|"message"|"image"|"layout"|"blank",
+# "name", "scene_id", "source": "api"|"mcp"|"rotation"}
 last_content: Optional[dict] = None
 # How long the last POST took: transfer + the ESP32's panel refresh
 last_refresh_ms: Optional[int] = None
@@ -255,16 +260,29 @@ async def send_to_esp32(data: bytes, content: Optional[dict] = None) -> dict:
     return response.json()
 
 
-async def display_image(img: Image.Image, content: Optional[dict] = None) -> dict:
-    """Send an image to the display on user request (API/web UI)"""
+async def push_image(img: Image.Image, content: dict, hold_minutes: Optional[float] = None) -> dict:
+    """Send an image on request (web UI, API, MCP). It stays up for a full
+    rotation interval, or for hold_minutes."""
+    result = await send_to_esp32(generator.to_raw_bytes(img), content)
+    scene_manager.hold(hold_minutes)
+    return result
+
+
+async def display_image(img: Image.Image, content: dict, hold_minutes: Optional[float] = None) -> dict:
+    """push_image for the REST API: errors become HTTP 500"""
     try:
-        result = await send_to_esp32(generator.to_raw_bytes(img), content)
+        result = await push_image(img, {**content, "source": "api"}, hold_minutes)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e) or type(e).__name__)
-
-    # Keep the manually chosen image up for a full rotation interval
-    scene_manager.reset_timer()
     return {"status": "ok", "result": result}
+
+
+def png_preview(img: Image.Image) -> bytes:
+    """PNG of an image as the panel shows it (black/white), scaled 2x for screens"""
+    img = generator.to_1bit(img)
+    buf = io.BytesIO()
+    img.resize((img.width * 2, img.height * 2), Image.Resampling.NEAREST).save(buf, format='PNG')
+    return buf.getvalue()
 
 
 def scene_content(scene) -> dict:
@@ -441,13 +459,7 @@ async def api_preview_scene(scene_id: str, cached: bool = False):
     else:
         img = await scene_manager.render_scene(scene_id)
 
-    img = generator.to_1bit(img)
-    buf = io.BytesIO()
-    preview = img.resize((img.width * 2, img.height * 2), Image.Resampling.NEAREST)
-    preview.save(buf, format='PNG')
-    buf.seek(0)
-    
-    return StreamingResponse(buf, media_type="image/png")
+    return Response(png_preview(img), media_type="image/png")
 
 
 # ============================================================================
@@ -511,6 +523,13 @@ async def api_set_interval(interval: int):
     return {"status": "ok", "interval": scene_manager.rotation_interval}
 
 
+@app.post("/api/rotation/resume")
+async def api_resume_rotation():
+    """End a hold (an image shown with hold_minutes) and continue rotating"""
+    scene_manager.release_hold()
+    return {"status": "ok"}
+
+
 @app.put("/api/rotation/order")
 async def api_set_order(order: list[str]):
     """Update scene rotation order"""
@@ -527,20 +546,25 @@ async def api_set_order(order: list[str]):
 async def api_get_notifications():
     """Get all notifications"""
     return {
-        "notifications": NotificationsScene._notifications,
+        "notifications": NotificationsScene.get_notifications(),
         "unread_count": NotificationsScene.get_unread_count(),
     }
 
 
 @app.post("/api/notifications")
 async def api_add_notification(notif: NotificationCreate):
-    """Add a notification"""
-    NotificationsScene.add_notification(
+    """Add a notification. show_now=true sends the Notifications scene right away
+    instead of at the next rotation."""
+    added = NotificationsScene.add_notification(
         title=notif.title,
         message=notif.message,
         priority=notif.priority,
+        expires_in_minutes=notif.expires_in_minutes,
     )
-    return {"status": "ok", "unread_count": NotificationsScene.get_unread_count()}
+    if notif.show_now:
+        scene = scene_manager.scenes['notifications']
+        await display_image(await scene.generate(generator), scene_content(scene))
+    return {"status": "ok", "id": added['id'], "unread_count": NotificationsScene.get_unread_count()}
 
 
 @app.delete("/api/notifications")
@@ -553,7 +577,8 @@ async def api_clear_notifications():
 @app.post("/api/notifications/{notif_id}/read")
 async def api_mark_notification_read(notif_id: int):
     """Mark notification as read"""
-    NotificationsScene.mark_read(notif_id)
+    if not NotificationsScene.mark_read(notif_id):
+        raise HTTPException(status_code=404, detail="Notification not found")
     return {"status": "ok"}
 
 
@@ -586,21 +611,29 @@ async def api_display_text(
 async def api_display_image(file: UploadFile = File(...)):
     """Upload and display custom image (scaled to fit, white borders)"""
     try:
-        img = Image.open(io.BytesIO(await file.read()))
-        img = ImageOps.exif_transpose(img)
-    
-        # Transparent areas should end up white, not black
-        if img.has_transparency_data:
-            img = img.convert('RGBA')
-            img = Image.alpha_composite(Image.new('RGBA', img.size, 'white'), img)
-        
-        img = ImageOps.pad(img.convert('L'), (generator.width, generator.height),
-                           method=Image.Resampling.LANCZOS, color=255)
-        img = img.convert('1')  # Dithered, better for photos than a threshold
+        img = generator.fit_image(await file.read())
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid image: {e}")
         
     return await display_image(img, {"kind": "image", "name": file.filename or "Image"})
+
+
+@app.post("/api/display/layout")
+async def api_display_layout(layout: LayoutRequest):
+    """Render blocks (header, text, list, ... see layout.py) and send them to the display"""
+    img, warnings = render_layout(layout.blocks, generator)
+    response = await display_image(img, {"kind": "layout", "name": layout_name(layout.blocks)},
+                                   layout.hold_minutes)
+    return {**response, "warnings": warnings}
+
+
+@app.post("/api/layout/preview")
+async def api_preview_layout(layout: LayoutRequest):
+    """Render blocks to a PNG without sending them. Warnings about anything that
+    didn't fit are in the X-Layout-Warnings header (JSON list)."""
+    img, warnings = render_layout(layout.blocks, generator)
+    return Response(png_preview(img), media_type="image/png",
+                    headers={"X-Layout-Warnings": json.dumps(warnings)})
 
 
 @app.get("/api/display/current")
@@ -633,15 +666,7 @@ async def api_last_image():
     if last_image is None:
         raise HTTPException(status_code=404, detail="No image sent yet")
     
-    img = Image.frombytes('1', (DISPLAY_WIDTH, DISPLAY_HEIGHT), last_image)
-    img = img.rotate(90, expand=True)
-    
-    buf = io.BytesIO()
-    preview = img.resize((img.width * 2, img.height * 2), Image.Resampling.NEAREST)
-    preview.save(buf, format='PNG')
-    buf.seek(0)
-    
-    return StreamingResponse(buf, media_type="image/png")
+    return Response(png_preview(frame_to_image(last_image)), media_type="image/png")
 
 
 # ============================================================================

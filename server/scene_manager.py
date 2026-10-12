@@ -47,6 +47,12 @@ class SceneManager:
         self._next_rotation: Optional[datetime] = None
         self._last_update: Optional[datetime] = None
         self._send_callback = None
+        # A manually sent image stays up until then (see hold())
+        self.hold_until: Optional[datetime] = None
+        
+        # Scenes keep their runtime state next to the config
+        Scene.data_dir = self.CONFIG_FILE.parent
+        NotificationsScene.load()
         
         # Initialize all available scenes
         self._init_scenes()
@@ -237,17 +243,31 @@ class SceneManager:
         """Restart the rotation countdown (manual display change, new interval)"""
         self._timer_reset.set()
     
+    def hold(self, minutes: Optional[float] = None):
+        """Keep a manually sent image up for minutes, or one rotation interval (None)"""
+        self.hold_until = datetime.now() + timedelta(minutes=minutes) if minutes else None
+        self.reset_timer()
+    
+    def release_hold(self):
+        """End a hold: rotation continues one interval from now"""
+        self.hold(None)
+    
     async def _rotation_loop(self):
         """Background rotation loop"""
         while True:
             try:
                 self._timer_reset.clear()
-                self._next_rotation = datetime.now() + timedelta(seconds=self.rotation_interval)
+                # A full interval, or until the hold ends
+                wait = self.rotation_interval
+                if self.hold_until:
+                    wait = max(1.0, (self.hold_until - datetime.now()).total_seconds())
+                self._next_rotation = datetime.now() + timedelta(seconds=wait)
                 try:
-                    await asyncio.wait_for(self._timer_reset.wait(), self.rotation_interval)
+                    await asyncio.wait_for(self._timer_reset.wait(), wait)
                     continue  # Timer was reset, start counting again
                 except asyncio.TimeoutError:
                     pass
+                self.hold_until = None
                 
                 if not self.rotation_enabled:
                     continue
@@ -261,7 +281,8 @@ class SceneManager:
                     if img and not self._timer_reset.is_set():
                         raw = self.generator.to_raw_bytes(img)
                         try:
-                            content = {'kind': 'scene', 'name': scene.name, 'scene_id': scene.id}
+                            content = {'kind': 'scene', 'name': scene.name, 'scene_id': scene.id,
+                                       'source': 'rotation'}
                             await self._send_callback(raw, content)
                             self._last_update = datetime.now()
                         except Exception as e:
@@ -307,6 +328,7 @@ class SceneManager:
             'next_scene': upcoming.id if upcoming else None,
             'next_scene_name': upcoming.name if upcoming else None,
             'next_rotation_in': next_in,
+            'held_until': self.hold_until.isoformat(timespec='seconds') if self.hold_until else None,
         }
     
     def get_all_scenes_info(self) -> list[dict]:

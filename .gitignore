@@ -20,6 +20,11 @@
 # Secrets (NEVER commit!)
 src/config/Secrets.h
 server/scene_config.json
+# Runtime state next to the config when running without Docker
+server/notifications.json
+server/agent_scene.json
+server/digest.json
+server/*.json.tmp
 server/data/
 server/.env
 

@@ -2,10 +2,11 @@
 Notifications Scene - Display pending notifications
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from PIL import Image, ImageDraw
 
+from layout import clean_text
 from .base import Scene, SceneConfig
 
 
@@ -28,38 +29,79 @@ class NotificationsScene(Scene):
         }
     ]
     
-    # Class-level notification storage
+    # Class-level notification storage, kept in notifications.json so it
+    # survives restarts. Ids keep counting up, also after a clear.
+    STATE_FILE = "notifications.json"
     _notifications: list[dict] = []
+    _next_id: int = 0
     
     @classmethod
-    def add_notification(cls, title: str, message: str, priority: str = "normal"):
-        """Add a notification"""
-        cls._notifications.append({
-            'id': len(cls._notifications),
+    def load(cls):
+        """Load saved notifications (called once by SceneManager)"""
+        state = cls.load_state(cls.STATE_FILE, {})
+        cls._notifications = state.get('notifications', [])
+        cls._next_id = state.get('next_id', max((n['id'] for n in cls._notifications), default=-1) + 1)
+        cls._prune()
+    
+    @classmethod
+    def _save(cls):
+        cls.save_state(cls.STATE_FILE, {'next_id': cls._next_id, 'notifications': cls._notifications})
+    
+    @classmethod
+    def _prune(cls):
+        """Drop expired notifications"""
+        now = datetime.now().isoformat()
+        active = [n for n in cls._notifications if not n.get('expires_at') or n['expires_at'] > now]
+        if len(active) != len(cls._notifications):
+            cls._notifications = active
+            cls._save()
+    
+    @classmethod
+    def add_notification(cls, title: str, message: str, priority: str = "normal",
+                         expires_in_minutes: Optional[int] = None) -> dict:
+        """Add a notification. With expires_in_minutes it disappears after that,
+        read or not."""
+        now = datetime.now()
+        notification = {
+            'id': cls._next_id,
             'title': title,
             'message': message,
             'priority': priority,  # low, normal, high
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': now.isoformat(),
+            'expires_at': (now + timedelta(minutes=expires_in_minutes)).isoformat() if expires_in_minutes else None,
             'read': False,
-        })
+        }
+        cls._next_id += 1
+        cls._notifications.append(notification)
+        cls._save()
+        return notification
+    
+    @classmethod
+    def get_notifications(cls) -> list[dict]:
+        """All notifications that haven't expired, read ones included"""
+        cls._prune()
+        return cls._notifications
     
     @classmethod
     def clear_notifications(cls):
         """Clear all notifications"""
         cls._notifications = []
+        cls._save()
     
     @classmethod
-    def mark_read(cls, notification_id: int):
-        """Mark notification as read"""
+    def mark_read(cls, notification_id: int) -> bool:
+        """Mark notification as read. False if there is no such notification."""
         for n in cls._notifications:
             if n['id'] == notification_id:
                 n['read'] = True
-                break
+                cls._save()
+                return True
+        return False
     
     @classmethod
     def get_unread_count(cls) -> int:
         """Get count of unread notifications"""
-        return sum(1 for n in cls._notifications if not n.get('read', False))
+        return sum(1 for n in cls.get_notifications() if not n.get('read', False))
     
     @classmethod
     def has_notifications(cls) -> bool:
@@ -71,7 +113,7 @@ class NotificationsScene(Scene):
         max_count = self.config.settings.get('max_notifications', 5)
         
         # Get unread notifications, sorted by timestamp (newest first)
-        unread = [n for n in self._notifications if not n.get('read', False)]
+        unread = [n for n in self.get_notifications() if not n.get('read', False)]
         unread.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
         
         return {
@@ -112,6 +154,10 @@ class NotificationsScene(Scene):
             # Priority indicator
             if priority == 'high':
                 draw.rectangle([4, y + 2, 6, y + 14], fill=0)
+            
+            # Emoji etc. would be drawn as boxes
+            title = clean_text(title, font_title)[0]
+            message = clean_text(message, font_msg)[0]
             
             # Title
             draw.text((10, y), title[:20], font=font_title, fill=0)
